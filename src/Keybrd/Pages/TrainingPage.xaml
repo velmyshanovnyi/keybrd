@@ -90,6 +90,8 @@
         </Border>
 
         <!-- Віртуальна клавіатура -->
+        <!-- Пасхалка проявляється на місці клавіатури, коли та згасла -->
+        <c:EggView x:Name="Egg" Grid.Row="1" Margin="0,16,0,0"/>
         <c:KeyboardView x:Name="Kbd" Grid.Row="1" Margin="0,16,0,0"/>
 
         <!-- Підказка, легенда і швидкі перемикачі -->
@@ -105,6 +107,8 @@
                               ToolTip="Озвучувати текст вправи" Click="Chip_Click"/>
                 <ToggleButton x:Name="ChipFix" Style="{StaticResource Chip}" Content="Backspace" Margin="6,0,0,4"
                               ToolTip="Помилка друкується, і її треба стерти Backspace та набрати правильно" Click="Chip_Click"/>
+                <ToggleButton x:Name="ChipEggs" Style="{StaticResource Chip}" Content="Пасхалки" Margin="6,0,0,4"
+                              ToolTip="На місці схованої клавіатури проявляється оптична ілюзія або фрактал, поки ви друкуєте без помилок" Click="Chip_Click"/>
                 <ToggleButton x:Name="ChipHide" Style="{StaticResource Chip}" Content="Ховати клавіатуру" Margin="6,0,0,4"
                               ToolTip="Клавіатура згасає, коли немає помилок, і повертається при помилці" Click="Chip_Click"/>
                 <ToggleButton x:Name="ChipLine" Style="{StaticResource Chip}" Content="Один рядок"

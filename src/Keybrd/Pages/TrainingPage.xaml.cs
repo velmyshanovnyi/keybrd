@@ -70,6 +70,7 @@ namespace Keybrd.Pages
             ChipFocus.IsChecked = c.FocusMode;
             ChipLine.IsChecked = c.SingleLine;
             ChipHide.IsChecked = c.AutoHideKeyboard;
+            ChipEggs.IsChecked = c.Eggs;
             ChipFix.IsChecked = c.FixMode;
             if (session != null) session.FixMode = c.FixMode;   // діє, доки вправу не почато
             ChipVoice.IsChecked = c.Voice;
@@ -111,6 +112,7 @@ namespace Keybrd.Pages
             if (sender == ChipFocus) AppConfig.Update(c => c.FocusMode = on);
             else if (sender == ChipLine) AppConfig.Update(c => c.SingleLine = on);
             else if (sender == ChipHide) AppConfig.Update(c => c.AutoHideKeyboard = on);
+            else if (sender == ChipEggs) AppConfig.Update(c => { c.Eggs = on; if (on) c.AutoHideKeyboard = true; });
             else if (sender == ChipFix) AppConfig.Update(c => c.FixMode = on);
             else if (sender == ChipVoice) ToggleVoice(on);
             else if (sender == ChipFingers) AppConfig.Update(c => c.ShowFingerColors = on);
@@ -244,6 +246,9 @@ namespace Keybrd.Pages
             onBreak = false;
             breakNumber = 0;
             cleanStreak = 0;
+            flow = 0;
+            // Нова вправа — інша картинка з ротації.
+            Egg.Kind = AppConfig.Current.DebugEgg >= 0 ? AppConfig.Current.DebugEgg : Egg.Kind + 1 + EggRnd.Next(EggView.Count - 1);
             spokenUntil = 0;
             note = null;
             errorPos = revealPos = -1;
@@ -359,6 +364,8 @@ namespace Keybrd.Pages
         // ---------- клавіатура, що згасає ----------
 
         private int cleanStreak;   // скільки клавіш поспіль натиснуто без помилки
+        private double flow;       // «потік»: росте з кожним чистим натисканням, від нього ростуть пасхалки
+        private static readonly Random EggRnd = new Random();
 
         /// <summary>
         /// Якщо ввімкнено «Ховати клавіатуру»: після 8 чистих натискань клавіатура починає згасати
@@ -370,11 +377,25 @@ namespace Keybrd.Pages
             double value = c.FocusMode ? 0.35 : 1;
             // Контрольний тест — без клавіатури на екрані.
             if (IsExam && session != null && !session.Finished) value = 0;
+            double hidden = 0;   // наскільки клавіатура схована: 0…1
             if (c.AutoHideKeyboard && session != null && !session.Finished && !onBreak)
             {
                 double factor = cleanStreak < 8 ? 1 : Math.Max(0, 1 - (cleanStreak - 8) / 20.0);
                 value *= factor;
+                hidden = 1 - factor;
             }
+
+            // Пасхалка проявляється на місці схованої клавіатури: спершу ледь помітно, далі виразніше —
+            // що довша серія чистих натискань. Помилка одразу ховає її разом з поверненням клавіатури.
+            double egg = c.Eggs && !IsExam ? hidden * (0.12 + 0.68 * Math.Min(1, flow / 150.0)) : 0;
+            Egg.Update(flow, session?.Cpm ?? 0, session?.Rhythm ?? 0);
+            if (instant || egg < Egg.Opacity)
+            {
+                Egg.BeginAnimation(OpacityProperty, null);
+                Egg.Opacity = egg;
+            }
+            else Egg.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(egg, TimeSpan.FromMilliseconds(600)));
+
             if (instant)
             {
                 Kbd.BeginAnimation(OpacityProperty, null);
@@ -508,6 +529,7 @@ namespace Keybrd.Pages
                 notePos = session.Pos;
             }
             cleanStreak = result == TypeResult.Wrong ? 0 : cleanStreak + 1;
+            flow = result == TypeResult.Wrong ? flow * 0.5 : flow + 1;   // помилка відкидає «потік» наполовину, а не до нуля
             lastKeyAt = DateTime.UtcNow;
             TrackErrors(result == TypeResult.Wrong);
             if (IsEndless)

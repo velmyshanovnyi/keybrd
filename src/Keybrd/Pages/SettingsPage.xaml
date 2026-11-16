@@ -108,6 +108,15 @@
                     </CheckBox>
 
                     <Border Style="{StaticResource Divider}"/>
+                    <CheckBox x:Name="Eggs" Style="{StaticResource ToggleSwitch}" Click="Option_Changed">
+                        <StackPanel>
+                            <TextBlock Text="Пасхалки"/>
+                            <TextBlock Text="Коли клавіатура схована, на її місці поступово проявляється оптична ілюзія або фрактал — тим виразніше, чим довше ви друкуєте без помилок. Фрактали ростуть і змінюють форму залежно від швидкості й ритму. Картинка займає боковий зір і допомагає не відриватися від тексту. Вмикає й «Ховати клавіатуру»."
+                                       Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </CheckBox>
+
+                    <Border Style="{StaticResource Divider}"/>
                     <CheckBox x:Name="AutoHide" Style="{StaticResource ToggleSwitch}" Click="Option_Changed">
                         <StackPanel>
                             <TextBlock Text="Ховати клавіатуру, коли немає помилок"/>

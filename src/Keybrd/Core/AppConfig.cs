@@ -41,6 +41,8 @@ namespace Keybrd.Core
         public bool ShowAltLetters = false;
         public bool FocusMode = false;
         public bool AutoHideKeyboard = false;    // клавіатура згасає, коли немає помилок
+        public bool Eggs = false;                // «Пасхалки»: ілюзії та фрактали на місці схованої клавіатури
+        public int DebugEgg = -1;                // прихований: завжди показувати пасхалку з цим номером (тест)
         public bool Voice = false;               // озвучувати текст вправи
         public int VoiceRate = 0;                // швидкість мовлення −5…5
         public int BreakMinutes = 10;            // перерва в уроці «Без зупинки»; 0 — без перерв
@@ -173,6 +175,8 @@ namespace Keybrd.Core
             DebugLog = Json.GetBool(d, "debugLog", DebugLog);
             DebugDayOffset = (int)Json.GetNumber(d, "debugDayOffset", 0, -10000, 10000);
             AutoHideKeyboard = Json.GetBool(d, "autoHideKeyboard", AutoHideKeyboard);
+            Eggs = Json.GetBool(d, "eggs", Eggs);
+            DebugEgg = (int)Json.GetNumber(d, "debugEgg", -1, -1, 100);
             Voice = Json.GetBool(d, "voice", Voice);
             VoiceRate = (int)Json.GetNumber(d, "voiceRate", VoiceRate, -5, 5);
             BreakMinutes = (int)Json.GetNumber(d, "breakMinutes", BreakMinutes, 0, 120);
@@ -230,6 +234,7 @@ namespace Keybrd.Core
                 ["focusMode"] = FocusMode,
                 ["singleLine"] = SingleLine,
                 ["autoHideKeyboard"] = AutoHideKeyboard,
+                ["eggs"] = Eggs,
                 ["voice"] = Voice,
                 ["voiceRate"] = VoiceRate,
                 ["breakMinutes"] = BreakMinutes,

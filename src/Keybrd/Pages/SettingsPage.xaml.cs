@@ -91,6 +91,7 @@ namespace Keybrd.Pages
             FocusMode.IsChecked = c.FocusMode;
             SingleLine.IsChecked = c.SingleLine;
             AutoHide.IsChecked = c.AutoHideKeyboard;
+            Eggs.IsChecked = c.Eggs;
             VoiceToggle.IsChecked = c.Voice;
             VoiceRateSlider.Value = c.VoiceRate;
             VoiceRateValue.Text = c.VoiceRate == 0 ? "звичайна" : c.VoiceRate > 0 ? $"швидше +{c.VoiceRate}" : $"повільніше {c.VoiceRate}";
@@ -138,6 +139,8 @@ namespace Keybrd.Pages
                 c.FocusMode = FocusMode.IsChecked == true;
                 c.SingleLine = SingleLine.IsChecked == true;
                 c.AutoHideKeyboard = AutoHide.IsChecked == true;
+                c.Eggs = Eggs.IsChecked == true;
+                if (sender == Eggs && c.Eggs) c.AutoHideKeyboard = true;   // пасхалки видно лише на місці схованої клавіатури
                 c.Voice = VoiceToggle.IsChecked == true;
                 c.SpeedUnit = UnitWpm.IsChecked == true ? "wpm" : "cpm";
                 c.UnlockAll = UnlockAll.IsChecked == true;
