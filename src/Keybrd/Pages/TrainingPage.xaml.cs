@@ -180,7 +180,6 @@ namespace Keybrd.Pages
                 startWords = DynamicTrainer.MasteredWords(lesson.Layout);
                 startLetters = DynamicTrainer.Letters(lesson.Layout).Length;
                 ExerciseName.Text = "без зупинки · " + DynamicTrainer.Status(lesson.Layout);
-                DebugLog.Write("TEXT", text);
             }
             else if (lesson.Kind == LessonKind.Dynamic)
             {
@@ -190,6 +189,9 @@ namespace Keybrd.Pages
             {
                 ExerciseName.Text = lesson.Kind == LessonKind.Adaptive ? "слабкі місця" : lesson.IsFree ? "вільна практика" : $"урок {lesson.Code} · {lesson.Title}";
             }
+
+            DebugLog.Write("TEXT", text);
+            DebugLog.Write("NAME", ExerciseName.Text);
 
             // Урок на F1–F12 без показаного ряду Fn не має сенсу.
             if (lesson.Kind == LessonKind.Fn && !AppConfig.Current.ShowFnRow)
@@ -655,6 +657,7 @@ namespace Keybrd.Pages
                 : lastPassed && next != null
                 ? "Enter — наступний урок, Esc — повторити цей текст"
                 : "Enter — новий текст, Esc — повторити цей текст";
+            DebugLog.Write("RESULT", $"{ResultTitle.Text}\t{ResultDetails.Text}\t{ResultWorst.Text}");
             UpdateProgress();
         }
 

@@ -175,6 +175,8 @@ namespace Keybrd.Core
                 if (fresh.Length > 0) parts.Add("у роботі: " + string.Join(" ", fresh.Select(SymbolName)));
             }
             parts.Add($"рівень {Level(layout)} з {Levels}");
+            int due = Mastery.DueCount(layout);
+            if (due > 0) parts.Add($"на повторенні: {due}");
             var focus = Focus(layout);
             if (focus.Count > 0) parts.Add("донавчання: " + string.Join(", ", focus));
             return string.Join(" · ", parts);
@@ -227,10 +229,9 @@ namespace Keybrd.Core
             var focusWords = new Dictionary<string, List<string>>();
             foreach (var g in focus) focusWords[g] = allowed.Where(w => w.Contains(g)).Take(10).ToList();
 
-            // 3. Вивчені слова для рідкісної перевірки: ті, яких найдовше не бачили.
-            var review = known.Where(kv => kv.Value.Mastered && allowed.Contains(kv.Key))
-                              .OrderBy(kv => kv.Value.LastDay).ThenBy(kv => kv.Value.Score)
-                              .Take(12).Select(kv => kv.Key).ToList();
+            // 3. Інтервальне повторення: вивчені слова, яким настав час перевірки, і слова
+            //    зі сполученнями на перевірці. Кожне — один раз за порцію, разом до третини порції.
+            var review = Review(layout, allowed, length / 3);
 
             // 4. Моторика: комбінації з повторами, часті склади й вимовні псевдослова з відкритих літер.
             var syllables = m.TopNgrams(2, letters, drillLetters, 6).Concat(m.TopNgrams(3, letters, drillLetters, 4)).ToList();
@@ -309,6 +310,8 @@ namespace Keybrd.Core
             var targets = new List<string>();
             void Refill()
             {
+                // Слова на повторенні йдуть у речення першими.
+                for (int k = 0; k < 2 && review.Count > 0; k++) { targets.Add(review[0]); review.RemoveAt(0); }
                 if (focus.Count > 0)
                 {
                     var list = focusWords[focus[Rnd.Next(focus.Count)]];
@@ -351,9 +354,10 @@ namespace Keybrd.Core
                     var list = focusWords[g];
                     Append(list.Count > 0 ? list[Rnd.Next(list.Count)] : g);
                 }
-                else if (review.Count > 0 && r > 0.92)
+                else if (review.Count > 0 && r > 0.65)
                 {
-                    Append(review[Rnd.Next(review.Count)]);
+                    Append(review[0]);
+                    review.RemoveAt(0);
                 }
                 else if (bag.Count == 0 || Rnd.NextDouble() < drillShare)
                 {
@@ -366,6 +370,27 @@ namespace Keybrd.Core
                 }
             }
             return sb.ToString();
+        }
+
+        /// <summary>Слова на повторення сьогодні: ті, чий час настав, і по одному слову на кожне сполучення на перевірці.</summary>
+        public static List<string> Review(string layout, List<string> allowed, int maxChars)
+        {
+            var set = new HashSet<string>(allowed);
+            var list = Mastery.DueWords(layout, 40).Where(set.Contains).ToList();
+            foreach (var g in Mastery.DueGrams(layout, 12))
+            {
+                var w = allowed.FirstOrDefault(x => x.Contains(g) && !list.Contains(x));
+                if (w != null) list.Add(w);
+            }
+            var result = new List<string>();
+            int chars = 0;
+            foreach (var w in list)
+            {
+                if (chars + w.Length + 1 > maxChars) break;
+                result.Add(w);
+                chars += w.Length + 1;
+            }
+            return result;
         }
 
         /// <summary>

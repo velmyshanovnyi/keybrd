@@ -127,6 +127,64 @@ namespace Keybrd.Pages
             UpdateHeat();
             BuildRecent(all);
             UpdateCourse();
+            BuildInsights();
+        }
+
+        // ---------- навички ----------
+
+        private void BuildInsights()
+        {
+            Insights.Children.Clear();
+            InsightReview();
+        }
+
+        /// <summary>Картка з заголовком і рядками тексту.</summary>
+        private StackPanel InsightCard(string title, string subtitle = null)
+        {
+            var panel = new StackPanel();
+            panel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold });
+            if (subtitle != null)
+            {
+                var sub = new TextBlock { Text = subtitle, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 6) };
+                sub.SetResourceReference(StyleProperty, "Muted");
+                panel.Children.Add(sub);
+            }
+            var card = new Border { Child = panel, Margin = new Thickness(0, 12, 0, 0) };
+            card.SetResourceReference(StyleProperty, "Card");
+            Insights.Children.Add(card);
+            return panel;
+        }
+
+        private static TextBlock Line(StackPanel panel, string text, bool muted = false)
+        {
+            var t = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0) };
+            if (muted) t.SetResourceReference(TextBlock.ForegroundProperty, "FgMutedBrush");
+            panel.Children.Add(t);
+            return t;
+        }
+
+        private void InsightReview()
+        {
+            var words = Mastery.WordsOf(Layout).Where(kv => kv.Value.Mastered).ToList();
+            if (words.Count == 0) return;
+            int today = Mastery.Today;
+            var due = Mastery.DueWords(Layout, 12);
+            int dueCount = Mastery.DueCount(Layout);
+            var p = InsightCard("Інтервальні повторення",
+                "Вивчене слово чи сполучення повертається на перевірку через 1, 3, 7, 21 і 60 днів. Чиста перевірка подовжує інтервал, помилка повертає в навчання.");
+            Line(p, dueCount > 0
+                ? $"На повторенні сьогодні: {dueCount}" + (due.Count > 0 ? " — " + string.Join(", ", due) + (dueCount > due.Count ? "…" : "") : "")
+                : "Сьогодні повторювати нічого не треба.");
+            var parts = new List<string>();
+            foreach (var i in Mastery.Intervals)
+            {
+                int n = words.Count(kv => kv.Value.Interval == i);
+                if (n > 0) parts.Add($"{i} дн. — {n}");
+            }
+            Line(p, "Слова за інтервалом: " + string.Join(" · ", parts), true);
+            int tomorrow = words.Count(kv => kv.Value.Due == today + 1);
+            int week = words.Count(kv => kv.Value.Due > today && kv.Value.Due <= today + 7);
+            Line(p, $"Завтра на повторення прийде слів: {tomorrow}, за тиждень: {week}.", true);
         }
 
         private void UpdateHeat()

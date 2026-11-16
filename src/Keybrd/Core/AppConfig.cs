@@ -45,6 +45,7 @@ namespace Keybrd.Core
         public int VoiceRate = 0;                // швидкість мовлення −5…5
         public int BreakMinutes = 10;            // перерва в уроці «Без зупинки»; 0 — без перерв
         public bool DebugLog = false;            // журнал debug.log для тестів
+        public int DebugDayOffset = 0;           // прихований: зсув «сьогодні» на N днів (тест повторень)
         public bool SingleLine = false;          // біжучий рядок: один рядок тексту, поточна літера по центру
         public double TextFontSize = 28;
 
@@ -163,6 +164,7 @@ namespace Keybrd.Core
             FocusMode = Json.GetBool(d, "focusMode", FocusMode);
             SingleLine = Json.GetBool(d, "singleLine", SingleLine);
             DebugLog = Json.GetBool(d, "debugLog", DebugLog);
+            DebugDayOffset = (int)Json.GetNumber(d, "debugDayOffset", 0, -10000, 10000);
             AutoHideKeyboard = Json.GetBool(d, "autoHideKeyboard", AutoHideKeyboard);
             Voice = Json.GetBool(d, "voice", Voice);
             VoiceRate = (int)Json.GetNumber(d, "voiceRate", VoiceRate, -5, 5);
@@ -200,7 +202,7 @@ namespace Keybrd.Core
                 ["maximized"] = WinMaximized,
             };
 
-            return new Dictionary<string, object>
+            var result = new Dictionary<string, object>
             {
                 ["version"] = CurrentVersion,
                 ["theme"] = Theme,
@@ -227,6 +229,10 @@ namespace Keybrd.Core
                 ["customPos"] = CustomPos,
                 ["window"] = window,
             };
+            // Приховані параметри для тестів пишемо, лише коли їх увімкнено.
+            if (DebugLog) result["debugLog"] = true;
+            if (DebugDayOffset != 0) result["debugDayOffset"] = DebugDayOffset;
+            return result;
         }
     }
 }
