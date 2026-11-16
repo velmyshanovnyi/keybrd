@@ -102,6 +102,17 @@ namespace Keybrd.Pages
             AccuracyValue.Text = $"{c.UnlockAccuracy:0}%";
             UnlockAll.IsChecked = c.UnlockAll;
             Sound.IsChecked = c.Sound;
+
+            StrictShift.IsChecked = c.StrictShift;
+            FixMode.IsChecked = c.FixMode;
+            Metronome.IsChecked = c.Metronome;
+            Pacer.IsChecked = c.Pacer;
+            TargetSlider.Value = c.TargetCpm;
+            TargetValue.Text = $"{TypingSession.FormatSpeed(c.TargetCpm, c.SpeedUnit)} {TypingSession.SpeedLabel(c.SpeedUnit)}";
+            foreach (var rb in new[] { Goal5, Goal10, Goal15, Goal20, Goal30 })
+                if ((string)rb.Tag == c.DailyGoal.ToString()) rb.IsChecked = true;
+            foreach (var rb in new[] { Exam1, Exam3, Exam5 })
+                if ((string)rb.Tag == c.ExamMinutes.ToString()) rb.IsChecked = true;
             syncing = false;
         }
 
@@ -131,6 +142,10 @@ namespace Keybrd.Pages
                 c.SpeedUnit = UnitWpm.IsChecked == true ? "wpm" : "cpm";
                 c.UnlockAll = UnlockAll.IsChecked == true;
                 c.Sound = Sound.IsChecked == true;
+                c.StrictShift = StrictShift.IsChecked == true;
+                c.FixMode = FixMode.IsChecked == true;
+                c.Metronome = Metronome.IsChecked == true;
+                c.Pacer = Pacer.IsChecked == true;
             });
             if (playSound) Sounds.Error(); // одразу дати почути, як він звучить
             if (playVoice) Speech.Say(AppConfig.Current.Layout == "en" ? "Voice is on." : "Озвучення увімкнено.", AppConfig.Current.Layout);
@@ -141,6 +156,27 @@ namespace Keybrd.Pages
             if (syncing || FontSizeValue == null) return;
             double v = System.Math.Round(e.NewValue);
             AppConfig.Update(c => c.TextFontSize = v);
+        }
+
+        private void Target_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (syncing || TargetValue == null) return;
+            int v = (int)(System.Math.Round(e.NewValue / 10) * 10);
+            AppConfig.Update(c => c.TargetCpm = v);
+        }
+
+        private void Goal_Checked(object sender, RoutedEventArgs e)
+        {
+            if (syncing) return;
+            int minutes = int.Parse((string)((FrameworkElement)sender).Tag);
+            AppConfig.Update(c => c.DailyGoal = minutes);
+        }
+
+        private void Exam_Checked(object sender, RoutedEventArgs e)
+        {
+            if (syncing) return;
+            int minutes = int.Parse((string)((FrameworkElement)sender).Tag);
+            AppConfig.Update(c => c.ExamMinutes = minutes);
         }
 
         private void Break_Checked(object sender, RoutedEventArgs e)

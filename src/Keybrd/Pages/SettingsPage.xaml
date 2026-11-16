@@ -187,6 +187,75 @@
                 </StackPanel>
             </Border>
 
+            <!-- Техніка і темп -->
+            <TextBlock Text="Техніка і темп" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <CheckBox x:Name="StrictShift" Style="{StaticResource ToggleSwitch}" Click="Option_Changed">
+                        <StackPanel>
+                            <TextBlock Text="Суворий Shift"/>
+                            <TextBlock Text="Велика літера, набрана Shift тієї ж руки, що й літера, рахується помилкою. Без цього програма лише підказує правильний Shift."
+                                       Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </CheckBox>
+
+                    <Border Style="{StaticResource Divider}"/>
+                    <CheckBox x:Name="FixMode" Style="{StaticResource ToggleSwitch}" Click="Option_Changed">
+                        <StackPanel>
+                            <TextBlock Text="Виправляти помилки клавішею Backspace"/>
+                            <TextBlock Text="Помилкова літера друкується, і її треба стерти та набрати правильно — як у справжній роботі. Без цього курсор стоїть, доки не натиснуто правильну клавішу."
+                                       Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </CheckBox>
+
+                    <Border Style="{StaticResource Divider}"/>
+                    <DockPanel>
+                        <TextBlock x:Name="TargetValue" DockPanel.Dock="Right" Style="{StaticResource Muted}" FontSize="13" VerticalAlignment="Center"/>
+                        <StackPanel>
+                            <TextBlock Text="Цільовий темп" FontWeight="SemiBold"/>
+                            <TextBlock Text="Швидкість для метронома і бігунка темпу. Ставте трохи нижче тієї, на якій починаються помилки." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <Slider x:Name="TargetSlider" Style="{StaticResource FluentSlider}" Minimum="60" Maximum="600" SmallChange="10" LargeChange="30"
+                            Margin="0,8,0,0" ValueChanged="Target_Changed"/>
+
+                    <Border Style="{StaticResource Divider}"/>
+                    <CheckBox x:Name="Metronome" Style="{StaticResource ToggleSwitch}" Click="Option_Changed">
+                        <StackPanel>
+                            <TextBlock Text="Метроном"/>
+                            <TextBlock Text="Тихий клац у цільовому темпі, поки триває вправа: одне натискання на один клац. Привчає до рівного ритму." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </CheckBox>
+
+                    <Border Style="{StaticResource Divider}"/>
+                    <CheckBox x:Name="Pacer" Style="{StaticResource ToggleSwitch}" Click="Option_Changed">
+                        <StackPanel>
+                            <TextBlock Text="Бігунок темпу"/>
+                            <TextBlock Text="Підкреслення в тексті рухається з цільовою швидкістю: видно, випереджаєте ви темп чи відстаєте." Style="{StaticResource Muted}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </CheckBox>
+
+                    <Border Style="{StaticResource Divider}"/>
+                    <TextBlock Text="Денна ціль" FontWeight="SemiBold"/>
+                    <TextBlock Text="Стільки триває «Щоденне заняття». Короткі заняття щодня дають більше, ніж довгі зрідка." Style="{StaticResource Muted}" Margin="0,2,0,10"/>
+                    <WrapPanel>
+                        <RadioButton x:Name="Goal5" Style="{StaticResource OptionRadio}" GroupName="Goal" Tag="5" Content="5 хв" Checked="Goal_Checked"/>
+                        <RadioButton x:Name="Goal10" Style="{StaticResource OptionRadio}" GroupName="Goal" Tag="10" Content="10 хв" Checked="Goal_Checked"/>
+                        <RadioButton x:Name="Goal15" Style="{StaticResource OptionRadio}" GroupName="Goal" Tag="15" Content="15 хв" Checked="Goal_Checked"/>
+                        <RadioButton x:Name="Goal20" Style="{StaticResource OptionRadio}" GroupName="Goal" Tag="20" Content="20 хв" Checked="Goal_Checked"/>
+                        <RadioButton x:Name="Goal30" Style="{StaticResource OptionRadio}" GroupName="Goal" Tag="30" Content="30 хв" Checked="Goal_Checked"/>
+                    </WrapPanel>
+
+                    <Border Style="{StaticResource Divider}"/>
+                    <TextBlock Text="Тривалість контрольного тесту" FontWeight="SemiBold"/>
+                    <WrapPanel Margin="0,10,0,0">
+                        <RadioButton x:Name="Exam1" Style="{StaticResource OptionRadio}" GroupName="Exam" Tag="1" Content="1 хв" Checked="Exam_Checked"/>
+                        <RadioButton x:Name="Exam3" Style="{StaticResource OptionRadio}" GroupName="Exam" Tag="3" Content="3 хв" Checked="Exam_Checked"/>
+                        <RadioButton x:Name="Exam5" Style="{StaticResource OptionRadio}" GroupName="Exam" Tag="5" Content="5 хв" Checked="Exam_Checked"/>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
             <!-- Гарячі клавіші -->
             <TextBlock Text="Гарячі клавіші" Style="{StaticResource SectionTitle}" Margin="0,24,0,10"/>
             <Border Style="{StaticResource Card}">

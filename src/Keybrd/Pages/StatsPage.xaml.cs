@@ -137,6 +137,19 @@ namespace Keybrd.Pages
             Insights.Children.Clear();
             InsightReview();
             InsightConfusion();
+            InsightShift();
+        }
+
+        private void InsightShift()
+        {
+            var v = StatsStore.ShiftOf(Layout);
+            int total = v[0] + v[1];
+            if (total == 0) return;
+            var p = InsightCard("Shift",
+                "Правильний Shift — на іншій руці, ніж літера: для літер лівої руки правий, для правої — лівий.");
+            Line(p, $"Правильним Shift набрано {v[0]} з {total} великих літер і знаків ({100.0 * v[0] / total:0}%).");
+            if (v[1] * 5 > total)
+                Line(p, "Часто тиснете Shift тією ж рукою. Щоб відвикнути, увімкніть «Суворий Shift» у налаштуваннях.", true);
         }
 
         private void StartPractice(string suffix)

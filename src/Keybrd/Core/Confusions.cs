@@ -11,7 +11,7 @@ namespace Keybrd.Core
         public int Count, Swaps;
         public string Kind;
 
-        public string Text => $"{Confusions.Name(Expected)} → {Confusions.Name(Typed)}";
+        public string Text => Expected == Typed ? $"{Confusions.Name(Expected)} з Shift" : $"{Confusions.Name(Expected)} → {Confusions.Name(Typed)}";
     }
 
     /// <summary>

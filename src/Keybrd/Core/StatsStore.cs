@@ -52,6 +52,11 @@ namespace Keybrd.Core
         /// <summary>розкладка → пара літер → статистика другої літери пари</summary>
         public static readonly Dictionary<string, Dictionary<string, KeyStat>> Bigrams = new Dictionary<string, Dictionary<string, KeyStat>>();
 
+        /// <summary>розкладка → [правильний Shift, не той Shift]</summary>
+        public static readonly Dictionary<string, int[]> Shift = new Dictionary<string, int[]>();
+
+        public static int[] ShiftOf(string layout) => Shift.TryGetValue(layout, out var v) ? v : new int[2];
+
         public static bool WasReset { get; private set; }
         public static event Action Changed;
 
@@ -161,6 +166,11 @@ namespace Keybrd.Core
             }
 
             Confusions.Record(s);
+            if (s.ShiftOk + s.ShiftWrong > 0)
+            {
+                if (!Shift.TryGetValue(s.Layout, out var sh)) Shift[s.Layout] = sh = new int[2];
+                sh[0] += s.ShiftOk; sh[1] += s.ShiftWrong;
+            }
 
             double sec = s.ElapsedMs / 1000.0;
             if (sec >= MinSessionSec)
@@ -196,7 +206,7 @@ namespace Keybrd.Core
         public static void Load()
         {
             DataStore.Resolve();
-            Sessions.Clear(); Lessons.Clear(); Keys.Clear(); Bigrams.Clear();
+            Sessions.Clear(); Lessons.Clear(); Keys.Clear(); Bigrams.Clear(); Shift.Clear();
             var path = FilePath;
             if (!File.Exists(path)) return;
             try
@@ -240,6 +250,11 @@ namespace Keybrd.Core
                 ReadStats(Json.GetObject(root, "keys"), Keys);
                 ReadStats(Json.GetObject(root, "bigrams"), Bigrams);
                 Confusions.Read(Json.GetObject(root, "confusions"));
+                var shift = Json.GetObject(root, "shift");
+                if (shift != null)
+                    foreach (var kv in shift)
+                        if (kv.Value is List<object> v && v.Count >= 2 && v[0] is double a && v[1] is double b)
+                            Shift[kv.Key] = new[] { (int)a, (int)b };
             }
             catch (Exception)
             {
@@ -295,7 +310,7 @@ namespace Keybrd.Core
         public static void Reset()
         {
             try { if (File.Exists(FilePath)) File.Copy(FilePath, DataStore.PathOf("stats.bak.json"), true); } catch { }
-            Sessions.Clear(); Lessons.Clear(); Keys.Clear(); Bigrams.Clear(); Confusions.Data.Clear();
+            Sessions.Clear(); Lessons.Clear(); Keys.Clear(); Bigrams.Clear(); Confusions.Data.Clear(); Shift.Clear();
             Save();
             Changed?.Invoke();
         }
@@ -333,6 +348,7 @@ namespace Keybrd.Core
                 ["keys"] = WriteStats(Keys),
                 ["bigrams"] = WriteStats(Bigrams),
                 ["confusions"] = Confusions.Write(),
+                ["shift"] = Shift.ToDictionary(kv => kv.Key, kv => (object)new List<object> { kv.Value[0], kv.Value[1] }),
             };
             try { DataStore.WriteAtomic(FilePath, Json.Write(root)); } catch { }
         }

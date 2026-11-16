@@ -30,6 +30,8 @@ namespace Keybrd.Core
         public int Pos { get; private set; }
         public int Keystrokes { get; private set; }
         public int Errors { get; private set; }
+        /// <summary>Скільки символів з Shift набрано правильним Shift (на іншій руці) і скільки — не тим.</summary>
+        public int ShiftOk, ShiftWrong;
         public bool Started { get; private set; }
         public bool Finished => stopped || Pos >= Text.Length;
         private bool stopped;
@@ -66,7 +68,8 @@ namespace Keybrd.Core
 
         public char? Current => Finished ? (char?)null : Text[Pos];
 
-        public TypeResult Type(string typed)
+        /// <param name="forceWrong">Зарахувати як помилку, навіть якщо символ вірний (суворий Shift).</param>
+        public TypeResult Type(string typed, bool forceWrong = false)
         {
             if (Finished || string.IsNullOrEmpty(typed)) return TypeResult.Ignored;
 
@@ -90,7 +93,7 @@ namespace Keybrd.Core
             Keystrokes++;
 
             char expected = Text[Pos];
-            bool ok = Same(typed[0], expected);
+            bool ok = !forceWrong && Same(typed[0], expected);
             Strokes.Add(new KeyStroke
             {
                 Expected = expected, Ok = ok, Ms = dt, Typed = typed[0],

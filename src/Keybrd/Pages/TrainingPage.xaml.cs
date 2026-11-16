@@ -172,6 +172,7 @@ namespace Keybrd.Pages
             breakNumber = 0;
             cleanStreak = 0;
             spokenUntil = 0;
+            note = null;
             ScheduleBreak();
 
             if (IsEndless)
@@ -361,7 +362,27 @@ namespace Keybrd.Pages
             // F1–F12 рахуються лише в уроці ряду Fn.
             if (KeyboardLayout.IsSpecial(ch[0]) && lesson.Kind != LessonKind.Fn) return;
 
-            var result = session.Type(ch);
+            // Правильний Shift — на протилежній руці від клавіші. Не той Shift зараховуємо, але підказуємо;
+            // у суворому режимі це помилка.
+            bool badShift = false;
+            if ((lShift || rShift) && session.Current != null && ch[0] == session.Current.Value
+                && KeyboardLayout.RowOf(id) >= 0 && KeyboardLayout.Find(session.Layout, ch[0], out _, out bool needShift) && needShift)
+            {
+                int right = KeyboardLayout.ShiftFor(id);
+                bool usedRight = right == KeyboardLayout.RShift ? rShift : lShift;
+                if (usedRight) session.ShiftOk++;
+                else
+                {
+                    badShift = true;
+                    session.ShiftWrong++;
+                    note = $"{KeyboardLayout.DisplayName(ch[0])} набирайте з {(right == KeyboardLayout.RShift ? "правим" : "лівим")} Shift: Shift має бути на іншій руці, ніж літера";
+                    notePos = session.Pos;
+                    Kbd.Flash(right, true);
+                    DebugLog.Write("SHIFT", $"{session.Pos}\t{ch}");
+                }
+            }
+
+            var result = session.Type(ch, badShift && AppConfig.Current.StrictShift);
             if (result == TypeResult.Ignored) return;
             Kbd.Flash(id, result != TypeResult.Wrong);
             if (result == TypeResult.Wrong && AppConfig.Current.Sound) Sounds.Error();
@@ -377,9 +398,14 @@ namespace Keybrd.Pages
             else if (result == TypeResult.Finished) lastPassed = StatsStore.Record(session, lesson);
             Render();
             UpdateStats();
+            UpdateHint();
             ApplyKeyboardOpacity(false);
             if (result != TypeResult.Wrong) SpeakAhead(false);
         }
+
+        // Коротка порада під клавіатурою (не той Shift, «сповільніться»): видно ще кільканадцять знаків.
+        private string note;
+        private int notePos;
 
         // ---------- відображення ----------
 
@@ -617,6 +643,8 @@ namespace Keybrd.Pages
             ResultDetails.Text =
                 $"{TypingSession.FormatSpeed(session.Cpm, unit)} {TypingSession.SpeedLabel(unit)}  ·  " +
                 $"точність {acc:0.#}%  ·  помилок {session.Errors}  ·  час {TypingSession.FormatTime(session.ElapsedMs)}";
+            if (session.ShiftOk + session.ShiftWrong > 0)
+                ResultDetails.Text += $"  ·  правильний Shift {session.ShiftOk} з {session.ShiftOk + session.ShiftWrong}";
 
             var worst = session.WorstChars(3).Select(KeyboardLayout.DisplayName).ToList();
             var worstText = worst.Count > 0 ? "Найбільше помилок: " + string.Join(", ", worst) : "Без жодної помилки";
@@ -681,6 +709,8 @@ namespace Keybrd.Pages
             if (Kbd.TargetId == 0 || session.Current == null) { HintText.Text = ""; return; }
 
             var hint = $"Наступна: {KeyboardLayout.DisplayName(session.Current.Value)} — {KeyboardLayout.FingerName(KeyboardLayout.FingerOf(Kbd.TargetId))}";
+            if (note != null && session.Pos >= notePos && session.Pos - notePos <= 15) hint = note;
+            else note = null;
             if (Kbd.TargetShiftId != 0)
                 hint += Kbd.TargetShiftId == KeyboardLayout.RShift ? " + правий Shift" : " + лівий Shift";
             if (IsEndless) hint += "   ·   Esc — завершити";

@@ -55,6 +55,13 @@ namespace Keybrd.Core
         public double UnlockAccuracy = 95;
         public bool UnlockAll = false;        // відкрити всі уроки одразу
         public bool Sound = false;               // звук при помилці
+        public bool StrictShift = false;         // Shift тієї ж руки — помилка
+        public bool FixMode = false;             // помилки виправляються Backspace
+        public int TargetCpm = 150;              // цільовий темп для метронома і бігунка
+        public bool Metronome = false;
+        public bool Pacer = false;
+        public int DailyGoal = 15;               // денна ціль, хв
+        public int ExamMinutes = 1;              // тривалість контрольного тесту
         public string LessonUk = "uk-1-1";
         public string LessonEn = "en-1-1";
 
@@ -176,6 +183,13 @@ namespace Keybrd.Core
             UnlockAccuracy = Json.GetNumber(d, "unlockAccuracy", UnlockAccuracy, 50, 100);
             UnlockAll = Json.GetBool(d, "unlockAll", UnlockAll);
             Sound = Json.GetBool(d, "sound", Sound);
+            StrictShift = Json.GetBool(d, "strictShift", StrictShift);
+            FixMode = Json.GetBool(d, "fixMode", FixMode);
+            TargetCpm = (int)Json.GetNumber(d, "targetCpm", TargetCpm, 60, 600);
+            Metronome = Json.GetBool(d, "metronome", Metronome);
+            Pacer = Json.GetBool(d, "pacer", Pacer);
+            DailyGoal = (int)Json.GetNumber(d, "dailyGoal", DailyGoal, 1, 120);
+            ExamMinutes = (int)Json.GetNumber(d, "examMinutes", ExamMinutes, 1, 30);
             CustomText = Json.GetString(d, "customText", CustomText);
             CustomPos = (int)Json.GetNumber(d, "customPos", CustomPos, 0, int.MaxValue);
 
@@ -224,6 +238,13 @@ namespace Keybrd.Core
                 ["unlockAll"] = UnlockAll,
                 ["textFontSize"] = TextFontSize,
                 ["sound"] = Sound,
+                ["strictShift"] = StrictShift,
+                ["fixMode"] = FixMode,
+                ["targetCpm"] = TargetCpm,
+                ["metronome"] = Metronome,
+                ["pacer"] = Pacer,
+                ["dailyGoal"] = DailyGoal,
+                ["examMinutes"] = ExamMinutes,
                 ["currentLesson"] = new Dictionary<string, object> { ["uk"] = LessonUk, ["en"] = LessonEn },
                 ["customText"] = CustomText,
                 ["customPos"] = CustomPos,
