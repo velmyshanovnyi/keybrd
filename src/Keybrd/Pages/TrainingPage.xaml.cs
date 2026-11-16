@@ -187,7 +187,7 @@ namespace Keybrd.Pages
             }
             else
             {
-                ExerciseName.Text = lesson.Kind == LessonKind.Adaptive ? "слабкі місця" : lesson.IsFree ? "вільна практика" : $"урок {lesson.Code} · {lesson.Title}";
+                ExerciseName.Text = PracticeName();
             }
 
             DebugLog.Write("TEXT", text);
@@ -203,6 +203,20 @@ namespace Keybrd.Pages
             CheckWindowsLayout();
             ApplyKeyboardOpacity(true);
             if (IsLoaded) SpeakAhead(true);
+        }
+
+        /// <summary>Підпис над текстом для уроків курсу і вільної практики.</summary>
+        private string PracticeName()
+        {
+            switch (lesson.Kind)
+            {
+                case LessonKind.Adaptive: return "слабкі місця";
+                case LessonKind.Confusion:
+                    var pairs = Confusions.LetterPairs(lesson.Layout, 3);
+                    return pairs.Count > 0 ? "плутанина · " + string.Join(", ", pairs.Select(p => p.Text)) : "плутанина · стійких пар поки немає";
+                default:
+                    return lesson.IsFree ? "вільна практика" : $"урок {lesson.Code} · {lesson.Title}";
+            }
         }
 
         private void GoNext()

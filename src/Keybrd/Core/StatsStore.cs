@@ -160,6 +160,8 @@ namespace Keybrd.Core
                 if (st.Ok) prev = letter ? st.Expected : '\0';
             }
 
+            Confusions.Record(s);
+
             double sec = s.ElapsedMs / 1000.0;
             if (sec >= MinSessionSec)
             {
@@ -237,11 +239,12 @@ namespace Keybrd.Core
 
                 ReadStats(Json.GetObject(root, "keys"), Keys);
                 ReadStats(Json.GetObject(root, "bigrams"), Bigrams);
+                Confusions.Read(Json.GetObject(root, "confusions"));
             }
             catch (Exception)
             {
                 try { File.Copy(path, DataStore.PathOf("stats.bak.json"), true); } catch { }
-                Sessions.Clear(); Lessons.Clear(); Keys.Clear(); Bigrams.Clear();
+                Sessions.Clear(); Lessons.Clear(); Keys.Clear(); Bigrams.Clear(); Confusions.Data.Clear();
                 WasReset = true;
                 Save(); // одразу записати чистий файл, щоб попередження не повторювалось
             }
@@ -292,7 +295,7 @@ namespace Keybrd.Core
         public static void Reset()
         {
             try { if (File.Exists(FilePath)) File.Copy(FilePath, DataStore.PathOf("stats.bak.json"), true); } catch { }
-            Sessions.Clear(); Lessons.Clear(); Keys.Clear(); Bigrams.Clear();
+            Sessions.Clear(); Lessons.Clear(); Keys.Clear(); Bigrams.Clear(); Confusions.Data.Clear();
             Save();
             Changed?.Invoke();
         }
@@ -329,6 +332,7 @@ namespace Keybrd.Core
                 ["lessons"] = lessons,
                 ["keys"] = WriteStats(Keys),
                 ["bigrams"] = WriteStats(Bigrams),
+                ["confusions"] = Confusions.Write(),
             };
             try { DataStore.WriteAtomic(FilePath, Json.Write(root)); } catch { }
         }

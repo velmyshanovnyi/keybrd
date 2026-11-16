@@ -136,6 +136,34 @@ namespace Keybrd.Pages
         {
             Insights.Children.Clear();
             InsightReview();
+            InsightConfusion();
+        }
+
+        private void StartPractice(string suffix)
+        {
+            var layout = Layout;
+            AppConfig.Update(c => c.SetLesson(layout + "-" + suffix));
+            (Window.GetWindow(this) as MainWindow)?.ShowTraining();
+        }
+
+        private Button ActionButton(StackPanel panel, string text, string suffix)
+        {
+            var b = new Button { Content = text, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 10, 0, 0) };
+            b.SetResourceReference(StyleProperty, "StdButton");
+            b.Click += (s, e) => StartPractice(suffix);
+            panel.Children.Add(b);
+            return b;
+        }
+
+        private void InsightConfusion()
+        {
+            var top = Confusions.Top(Layout, 8);
+            if (top.Count == 0) return;
+            var p = InsightCard("Ви плутаєте",
+                "Що ви натискаєте замість потрібної клавіші. Пара потрапляє сюди після трьох однакових помилок і зникає, коли помилка перестає повторюватись.");
+            foreach (var c in top)
+                Line(p, $"{c.Text}   ·   {c.Kind}   ·   {c.Count} раз.");
+            if (Confusions.LetterPairs(Layout, 1).Count > 0) ActionButton(p, "Тренувати плутанину", "confusion");
         }
 
         /// <summary>Картка з заголовком і рядками тексту.</summary>

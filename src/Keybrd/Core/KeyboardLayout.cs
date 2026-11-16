@@ -81,6 +81,35 @@ namespace Keybrd.Core
             return -1;
         }
 
+        /// <summary>Місце клавіші на клавіатурі: ряд і горизонтальна позиція з урахуванням зсуву рядів.</summary>
+        public static bool Position(int id, out int row, out double x)
+        {
+            row = RowOf(id); x = 0;
+            if (id == Space) { row = 4; x = 6; return true; }
+            if (row < 0) return false;
+            var scans = row == 0 ? DigitScans : row == 1 ? QScans : row == 2 ? AScans : ZScans;
+            double[] offset = { 0, 1.5, 1.75, 2.25 };
+            x = Array.IndexOf(scans, id) + offset[row];
+            return true;
+        }
+
+        /// <summary>Чи стоять дві клавіші поруч (у ряду або по діагоналі).</summary>
+        public static bool Adjacent(int a, int b)
+        {
+            if (a == b || !Position(a, out int ra, out double xa) || !Position(b, out int rb, out double xb)) return false;
+            if (ra == 4 || rb == 4) return false;
+            return Math.Abs(ra - rb) <= 1 && Math.Abs(xa - xb) <= 1.1;
+        }
+
+        /// <summary>Дзеркальні клавіші: той самий ряд і той самий палець іншої руки.</summary>
+        public static bool Mirror(int a, int b)
+        {
+            if (a == b || RowOf(a) < 0 || RowOf(a) != RowOf(b)) return false;
+            var fa = FingerOf(a); var fb = FingerOf(b);
+            if (fa < Finger.LPinky || fa > Finger.RPinky || fb < Finger.LPinky || fb > Finger.RPinky) return false;
+            return (int)fa + (int)fb == 7;
+        }
+
         // ---------- функціональні клавіші як «символи» вправи ----------
 
         /// <summary>Esc, F1–F12, Del позначаються у тексті вправи символами з приватної області Unicode.</summary>

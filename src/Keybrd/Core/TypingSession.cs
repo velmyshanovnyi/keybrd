@@ -13,6 +13,8 @@ namespace Keybrd.Core
         public char Expected;
         public bool Ok;
         public int Ms;
+        /// <summary>Що натиснули насправді і яка літера йшла в тексті наступною (для аналізу плутанини).</summary>
+        public char Typed, Next;
     }
 
     /// <summary>
@@ -89,7 +91,11 @@ namespace Keybrd.Core
 
             char expected = Text[Pos];
             bool ok = Same(typed[0], expected);
-            Strokes.Add(new KeyStroke { Expected = expected, Ok = ok, Ms = dt });
+            Strokes.Add(new KeyStroke
+            {
+                Expected = expected, Ok = ok, Ms = dt, Typed = typed[0],
+                Next = Pos + 1 < Text.Length ? Text[Pos + 1] : (char)0,
+            });
 
             if (!ok)
             {

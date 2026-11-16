@@ -50,6 +50,7 @@ namespace Keybrd.Core
                 case LessonKind.Fn: return Fn(l);
                 case LessonKind.Adaptive: return Adaptive(l);
                 case LessonKind.Custom: return CustomText(l);
+                case LessonKind.Confusion: return ConfusionText(l);
                 case LessonKind.Dynamic:
                 case LessonKind.Endless: return DynamicTrainer.Generate(l);
                 default: return FreeText(l);
@@ -357,6 +358,59 @@ namespace Keybrd.Core
                 else w = PickWeighted(words, m);
                 if (w.Length >= 3 && Rnd.NextDouble() < 0.25) pending = w;
                 return w;
+            }
+            return Build(head, Next, l.Length);
+        }
+
+        // ---------- плутанина ----------
+
+        /// <summary>
+        /// «Плутанина»: для найчастіших пар «треба → натиснули» — обидві літери по черзі, контрастні склади,
+        /// слова з однією з літер упереміш і слова з обома. Без даних — звичайні часті слова.
+        /// </summary>
+        private static string ConfusionText(Lesson l)
+        {
+            var pairs = Confusions.LetterPairs(l.Layout, 3);
+            if (pairs.Count == 0) return FreeText(l);
+            var m = LanguageModel.For(l.Layout);
+            var words = m.Words.Where(w => !w.Any(char.IsUpper) && w.Length >= 2 && w.Length <= 9).ToList();
+            string vowels = m.Vowels;
+
+            var head = new List<string>();
+            var pools = new List<List<string>>();
+            foreach (var p in pairs)
+            {
+                char a = p.Expected, b = p.Typed;
+                head.Add(new string(a, 3)); head.Add(new string(b, 3));
+                head.Add($"{a}{b}"); head.Add($"{b}{a}"); head.Add($"{a}{b}{a}"); head.Add($"{b}{a}{b}");
+                // Контрастні склади: та сама голосна (або приголосна) з кожною з двох літер.
+                foreach (var v in (m.IsVowel(a) && m.IsVowel(b) ? "нтлс" : vowels).Take(2))
+                {
+                    if (v == a || v == b) continue;
+                    head.Add($"{a}{v}"); head.Add($"{b}{v}");
+                }
+                var withA = words.Where(w => w.IndexOf(a) >= 0 && w.IndexOf(b) < 0).OrderBy(_ => Rnd.Next()).Take(14).ToList();
+                var withB = words.Where(w => w.IndexOf(b) >= 0 && w.IndexOf(a) < 0).OrderBy(_ => Rnd.Next()).Take(14).ToList();
+                var both = words.Where(w => w.IndexOf(a) >= 0 && w.IndexOf(b) >= 0).OrderBy(_ => Rnd.Next()).Take(10).ToList();
+                // Слова чергуються: з першою літерою, з другою, з обома.
+                var pool = new List<string>();
+                for (int i = 0; i < 14; i++)
+                {
+                    if (i < withA.Count) pool.Add(withA[i]);
+                    if (i < withB.Count) pool.Add(withB[i]);
+                    if (i < both.Count) pool.Add(both[i]);
+                }
+                if (pool.Count == 0) { pool.Add($"{a}{b}"); pool.Add($"{b}{a}"); }
+                pools.Add(pool);
+            }
+
+            int turn = 0;
+            var index = new int[pools.Count];
+            string Next()
+            {
+                int k = turn++ % pools.Count;
+                var pool = pools[k];
+                return pool[index[k]++ % pool.Count];
             }
             return Build(head, Next, l.Length);
         }

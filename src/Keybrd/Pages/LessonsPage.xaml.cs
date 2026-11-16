@@ -72,6 +72,7 @@ namespace Keybrd.Pages
             AddRow(Course.Dynamic(Layout));
             AddRow(Course.Free(Layout));
             AddRow(Course.Weak(Layout));
+            AddRow(Course.Confusion(Layout));
             AddRow(Course.Custom(Layout));
 
             int stage = 0;
@@ -158,6 +159,7 @@ namespace Keybrd.Pages
             DKeys.Children.Clear();
             bool dyn = l.Kind == LessonKind.Dynamic || l.Kind == LessonKind.Endless;
             var keys = dyn ? DynamicTrainer.Focus(l.Layout).ToArray()
+                     : l.Kind == LessonKind.Confusion ? Confusions.LetterPairs(l.Layout, 3).Select(p => p.Text).ToArray()
                      : l.Kind == LessonKind.Fn ? new[] { "F1", "…", "F12", "Del" }
                      : l.Kind == LessonKind.Adaptive ? StatsStore.WeakKeys(l.Layout, 6).Select(k => k.ToUpper()).Concat(StatsStore.WeakBigrams(l.Layout, 4)).ToArray()
                      : l.NewKeys.Select(ch => ch.ToString().ToUpper()).ToArray();
@@ -177,6 +179,9 @@ namespace Keybrd.Pages
             StartButton.Content = isPassed ? "Пройти ще раз" : "Почати урок";
             var prev = Course.Previous(l);
             DLock.Text = dyn ? DynamicSummary(l.Layout, keys.Length > 0)
+                : l.Kind == LessonKind.Confusion && keys.Length == 0
+                ? "Стійких пар поки немає: пара з’являється після трьох однакових помилок. Зараз вправа складатиметься з частих слів."
+                : l.Kind == LessonKind.Confusion ? "Зараз у роботі ці пари: потрібна літера → та, яку ви натискаєте замість неї."
                 : l.Kind == LessonKind.Adaptive && keys.Length == 0
                 ? "Поки замало даних — пройдіть кілька вправ, і тут з’являться ваші слабкі клавіші. Зараз вправа складатиметься з частих слів."
                 : l.Kind == LessonKind.Adaptive ? "Зараз у фокусі ці клавіші та сполучення літер."

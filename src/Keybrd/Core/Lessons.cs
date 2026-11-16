@@ -7,7 +7,7 @@ using System.Text;
 
 namespace Keybrd.Core
 {
-    public enum LessonKind { Keys, Words, Capitals, Sentences, Digits, Symbols, Fn, Speed, Free, Adaptive, Custom, Dynamic, Endless }
+    public enum LessonKind { Keys, Words, Capitals, Sentences, Digits, Symbols, Fn, Speed, Free, Adaptive, Custom, Dynamic, Endless, Confusion, Daily, Placement, Exam, Dictation }
 
     public sealed class Lesson
     {
@@ -26,7 +26,7 @@ namespace Keybrd.Core
         public int Length = 150;
 
         /// <summary>Вільна практика або «слабкі місця»: без мети й зарахування.</summary>
-        public bool IsFree => Kind == LessonKind.Free || Kind == LessonKind.Adaptive || Kind == LessonKind.Custom || Kind == LessonKind.Dynamic || Kind == LessonKind.Endless;
+        public bool IsFree => Kind >= LessonKind.Free;
         public string Code => IsFree ? "—" : $"{Stage}.{Number}";
     }
 
@@ -100,6 +100,21 @@ namespace Keybrd.Core
             return l;
         }
 
+        private static Lesson Practice(string layout, string suffix, LessonKind kind, string title, string description, int length)
+        {
+            var l = Free(layout);
+            l.Id = layout + "-" + suffix;
+            l.Kind = kind;
+            l.Title = title;
+            l.Description = description;
+            l.Length = length;
+            return l;
+        }
+
+        public static Lesson Confusion(string layout) => Practice(layout, "confusion", LessonKind.Confusion, "Плутанина",
+            "Програма запам’ятовує, яку клавішу ви натискаєте замість потрібної. Ця вправа ставить такі літери поруч: " +
+            "по черзі, у контрастних складах і в словах з кожною з них, щоб пальці навчилися їх розрізняти.", 190);
+
         public static Lesson Find(string id)
         {
             if (string.IsNullOrEmpty(id)) return null;
@@ -109,6 +124,7 @@ namespace Keybrd.Core
             if (id.EndsWith("-custom")) return Custom(layout);
             if (id.EndsWith("-dynamic")) return Dynamic(layout);
             if (id.EndsWith("-endless")) return Endless(layout);
+            if (id.EndsWith("-confusion")) return Confusion(layout);
             return For(layout).FirstOrDefault(l => l.Id == id);
         }
 
