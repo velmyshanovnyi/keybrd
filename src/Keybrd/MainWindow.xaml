@@ -20,6 +20,8 @@
         <!-- Заголовок вікна -->
         <DockPanel Grid.Row="0">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="PinButton" Style="{StaticResource CaptionButton}" FontSize="14"
+                        Click="PinButton_Click"/>
                 <Button x:Name="ThemeButton" Style="{StaticResource CaptionButton}" FontSize="14"
                         Click="ThemeButton_Click"/>
                 <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" ToolTip="Згорнути"

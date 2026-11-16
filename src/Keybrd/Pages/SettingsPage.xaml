@@ -274,7 +274,7 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
-                        <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                        <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
                     </Grid.RowDefinitions>
                     <Border Grid.Row="0" Style="{StaticResource Hotkey}"><TextBlock Text="Esc"/></Border>
                     <TextBlock Grid.Row="0" Grid.Column="1" Text="Почати поточну вправу заново" VerticalAlignment="Center"/>
@@ -292,6 +292,8 @@
                     <TextBlock Grid.Row="6" Grid.Column="1" Text="Наступна вкладка (з Shift — попередня)" VerticalAlignment="Center"/>
                     <Border Grid.Row="7" Style="{StaticResource Hotkey}"><TextBlock Text="Win+Пробіл"/></Border>
                     <TextBlock Grid.Row="7" Grid.Column="1" Text="Перемкнути розкладку Windows (системна комбінація)" VerticalAlignment="Center"/>
+                    <Border Grid.Row="8" Style="{StaticResource Hotkey}"><TextBlock Text="Ctrl+P"/></Border>
+                    <TextBlock Grid.Row="8" Grid.Column="1" Text="Закріпити вікно поверх інших / відкріпити" VerticalAlignment="Center"/>
                 </Grid>
             </Border>
 

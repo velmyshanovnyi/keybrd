@@ -35,6 +35,7 @@ namespace Keybrd
             ThemeManager.Changed += UpdateThemeButton;
 
             UpdateThemeButton();
+            UpdatePinButton();
             TabTraining.IsChecked = true;
             ShowStartupNotices();
         }
@@ -87,6 +88,11 @@ namespace Keybrd
             else if (e.Key == Key.T)
             {
                 ThemeManager.Toggle();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.P)
+            {
+                TogglePin();
                 e.Handled = true;
             }
             else if (e.Key == Key.Tab)
@@ -154,6 +160,25 @@ namespace Keybrd
         }
 
         private void ThemeButton_Click(object sender, RoutedEventArgs e) => ThemeManager.Toggle();
+
+        /// <summary>Закріпити вікно поверх усіх інших (або відкріпити). Стан запам'ятовується.</summary>
+        private void TogglePin()
+        {
+            AppConfig.Update(c => c.Pinned = !c.Pinned);
+            UpdatePinButton();
+        }
+
+        private void UpdatePinButton()
+        {
+            bool on = AppConfig.Current.Pinned;
+            Topmost = on;
+            PinButton.Content = on ? "" : "";
+            PinButton.ToolTip = on ? "Вікно закріплено поверх інших — відкріпити (Ctrl+P)" : "Закріпити вікно поверх інших (Ctrl+P)";
+            if (on) PinButton.SetResourceReference(ForegroundProperty, "AccentBrush");
+            else PinButton.ClearValue(ForegroundProperty);
+        }
+
+        private void PinButton_Click(object sender, RoutedEventArgs e) => TogglePin();
         private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
 

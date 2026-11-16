@@ -58,6 +58,7 @@ namespace Keybrd.Core
         public bool UnlockAll = false;        // відкрити всі уроки одразу
         public bool Sound = false;               // звук при помилці
         public bool CheckUpdates = true;         // при старті перевіряти нову версію на GitHub
+        public bool DebugNoWarn = false;         // прихований: не показувати попередження про розкладку Windows (знімки для README)
         public string DebugUpdateUrl = "";       // прихований: інша адреса файлу версії (тест)
         public bool StrictShift = false;         // Shift тієї ж руки — помилка
         public bool FixMode = false;             // помилки виправляються Backspace
@@ -76,6 +77,7 @@ namespace Keybrd.Core
         // --- Вікно ---
         public double WinX = double.NaN, WinY = double.NaN, WinW = 1100, WinH = 720;
         public bool WinMaximized;
+        public bool Pinned;                      // вікно поверх усіх інших
 
         // --- Типовий текст для «Свого тексту»: файл default_text.txt поруч з exe ---
         public static string DefaultTextFile(string layout) => $"default_text_{layout}.txt";
@@ -191,6 +193,7 @@ namespace Keybrd.Core
             Sound = Json.GetBool(d, "sound", Sound);
             CheckUpdates = Json.GetBool(d, "checkUpdates", CheckUpdates);
             DebugUpdateUrl = Json.GetString(d, "debugUpdateUrl", "");
+            DebugNoWarn = Json.GetBool(d, "debugNoWarn", false);
             StrictShift = Json.GetBool(d, "strictShift", StrictShift);
             FixMode = Json.GetBool(d, "fixMode", FixMode);
             TargetCpm = (int)Json.GetNumber(d, "targetCpm", TargetCpm, 60, 600);
@@ -211,6 +214,7 @@ namespace Keybrd.Core
             WinW = Json.GetNumber(w, "w", WinW, 400, 10000);
             WinH = Json.GetNumber(w, "h", WinH, 300, 10000);
             WinMaximized = Json.GetBool(w, "maximized", WinMaximized);
+            Pinned = Json.GetBool(w, "pinned", Pinned);
         }
 
         private Dictionary<string, object> ToDict()
@@ -222,6 +226,7 @@ namespace Keybrd.Core
                 ["w"] = Math.Round(WinW),
                 ["h"] = Math.Round(WinH),
                 ["maximized"] = WinMaximized,
+                ["pinned"] = Pinned,
             };
 
             var result = new Dictionary<string, object>

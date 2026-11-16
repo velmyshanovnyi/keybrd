@@ -1058,7 +1058,7 @@ namespace Keybrd.Pages
         private void CheckWindowsLayout()
         {
             if (session == null) return;
-            bool ok = lesson.Kind == LessonKind.Fn || OsInfo.WindowsLayoutMatches(session.Layout);
+            bool ok = lesson.Kind == LessonKind.Fn || AppConfig.Current.DebugNoWarn || OsInfo.WindowsLayoutMatches(session.Layout);
             var notes = new System.Collections.Generic.List<string>();
             if (!ok)
                 notes.Add((session.Layout == "en" ? "Розкладка Windows зараз не англійська." : "Розкладка Windows зараз не українська.")
