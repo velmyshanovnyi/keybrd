@@ -110,7 +110,8 @@ namespace Keybrd.Core
         }
 
         /// <summary>Контрольні тести розкладки, від найдавнішого.</summary>
-        public static List<SessionRecord> Exams(string layout) => Sessions.Where(s => s.Lesson == layout + "-exam").ToList();
+        /// <remarks>Перервані тести (коротші за хвилину) у порівняння не йдуть.</remarks>
+        public static List<SessionRecord> Exams(string layout) => Sessions.Where(s => s.Lesson == layout + "-exam" && s.DurationSec >= 55).ToList();
 
         public static bool WasReset { get; private set; }
         public static event Action Changed;
