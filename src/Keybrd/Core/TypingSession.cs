@@ -18,7 +18,10 @@ namespace Keybrd.Core
     }
 
     /// <summary>
-    /// Одна вправа. Режим «стоп на помилці»: курсор не рухається, доки не натиснуто правильну клавішу.
+    /// Одна вправа. Два режими:
+    ///   • «стоп на помилці» — курсор не рухається, доки не натиснуто правильну клавішу;
+    ///   • FixMode — помилкова літера друкується, курсор іде далі, а помилку треба стерти Backspace
+    ///     і набрати правильно; вправа завершується, коли невиправлених помилок не лишилось.
     /// Паузи довші за MaxGapMs не рахуються в час, щоб відволікання не псувало швидкість.
     /// </summary>
     public sealed class TypingSession
@@ -33,8 +36,25 @@ namespace Keybrd.Core
         /// <summary>Скільки символів з Shift набрано правильним Shift (на іншій руці) і скільки — не тим.</summary>
         public int ShiftOk, ShiftWrong;
         public bool Started { get; private set; }
-        public bool Finished => stopped || Pos >= Text.Length;
+        public bool Finished => stopped || (Pos >= Text.Length && Uncorrected == 0);
         private bool stopped;
+
+        /// <summary>Помилки виправляються Backspace. Можна змінити лише до першого натискання.</summary>
+        public bool FixMode
+        {
+            get => fixMode;
+            set { if (!Started) fixMode = value; }
+        }
+        private bool fixMode;
+
+        /// <summary>Позиції, де зараз стоїть невиправлена помилкова літера (лише FixMode).</summary>
+        public bool[] Wrong;
+        /// <summary>Скільки мс пішло на кожну позицію тексту (разом з помилковими спробами).</summary>
+        public double[] TimeAt;
+        public int Uncorrected { get; private set; }
+        public int Corrections { get; private set; }
+        /// <summary>Нижче цієї позиції Backspace не повертає (вже оцінена частина уроку без зупинки).</summary>
+        public int Floor;
 
         /// <summary>Дописати текст (урок без зупинки).</summary>
         public void Append(string more)
@@ -42,6 +62,8 @@ namespace Keybrd.Core
             if (string.IsNullOrEmpty(more) || stopped) return;
             Text += more;
             Array.Resize(ref HadError, Text.Length);
+            Array.Resize(ref Wrong, Text.Length);
+            Array.Resize(ref TimeAt, Text.Length);
         }
 
         /// <summary>Завершити вправу достроково (урок без зупинки закінчує сама людина).</summary>
@@ -64,14 +86,29 @@ namespace Keybrd.Core
             Text = text ?? "";
             Layout = layout;
             HadError = new bool[Text.Length];
+            Wrong = new bool[Text.Length];
+            TimeAt = new double[Text.Length];
         }
 
-        public char? Current => Finished ? (char?)null : Text[Pos];
+        public char? Current => Finished || Pos >= Text.Length ? (char?)null : Text[Pos];
+
+        /// <summary>Стерти останній символ (FixMode). Повертає false, якщо стирати нічого.</summary>
+        public bool Backspace()
+        {
+            if (!fixMode || Finished || !Started || Pos <= Floor) return false;
+            long now = sw.ElapsedMilliseconds;
+            activeMs += Math.Min(now - lastMs, MaxGapMs);
+            lastMs = now;
+            Pos--;
+            if (Wrong[Pos]) { Wrong[Pos] = false; Uncorrected--; Corrections++; }
+            return true;
+        }
 
         /// <param name="forceWrong">Зарахувати як помилку, навіть якщо символ вірний (суворий Shift).</param>
         public TypeResult Type(string typed, bool forceWrong = false)
         {
-            if (Finished || string.IsNullOrEmpty(typed)) return TypeResult.Ignored;
+            // У кінці тексту з невиправленими помилками чекаємо лише на Backspace.
+            if (Finished || Pos >= Text.Length || string.IsNullOrEmpty(typed)) return TypeResult.Ignored;
 
             long now;
             int dt;
@@ -91,6 +128,7 @@ namespace Keybrd.Core
             }
             lastMs = now;
             Keystrokes++;
+            TimeAt[Pos] += dt;
 
             char expected = Text[Pos];
             bool ok = !forceWrong && Same(typed[0], expected);
@@ -104,6 +142,10 @@ namespace Keybrd.Core
             {
                 Errors++;
                 HadError[Pos] = true;
+                if (!fixMode) return TypeResult.Wrong;
+                Wrong[Pos] = true;
+                Uncorrected++;
+                Pos++;
                 return TypeResult.Wrong;
             }
 
@@ -133,13 +175,13 @@ namespace Keybrd.Core
             }
         }
 
-        /// <summary>Знаків за хвилину (правильно набраних).</summary>
+        /// <summary>Знаків за хвилину (правильно набраних; невиправлені помилки не рахуються).</summary>
         public double Cpm
         {
             get
             {
                 double min = ElapsedMs / 60000.0;
-                return min < 1.0 / 60 ? 0 : Pos / min;
+                return min < 1.0 / 60 ? 0 : (Pos - Uncorrected) / min;
             }
         }
 

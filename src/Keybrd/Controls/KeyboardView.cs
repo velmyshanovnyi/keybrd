@@ -90,8 +90,19 @@ namespace Keybrd.Controls
         public void SetTarget(char? ch)
         {
             target = ch;
+            forcedId = 0;
             Refresh();
         }
+
+        /// <summary>Підсвітити службову клавішу (наприклад, Backspace, коли треба виправити помилку).</summary>
+        public void SetTargetKey(int id)
+        {
+            target = null;
+            forcedId = id;
+            Refresh();
+        }
+
+        private int forcedId;
 
         public void Press(int id, bool down)
         {
@@ -251,6 +262,7 @@ namespace Keybrd.Controls
                 TargetId = id;
                 TargetShiftId = shift ? KeyboardLayout.ShiftFor(id) : 0;
             }
+            if (forcedId != 0) TargetId = forcedId;
 
             foreach (var cap in caps)
             {

@@ -62,6 +62,8 @@ namespace Keybrd.Pages
             ChipFocus.IsChecked = c.FocusMode;
             ChipLine.IsChecked = c.SingleLine;
             ChipHide.IsChecked = c.AutoHideKeyboard;
+            ChipFix.IsChecked = c.FixMode;
+            if (session != null) session.FixMode = c.FixMode;   // діє, доки вправу не почато
             ChipVoice.IsChecked = c.Voice;
             ChipFingers.IsChecked = c.ShowFingerColors;
             ChipAlt.IsChecked = c.ShowAltLetters;
@@ -101,6 +103,7 @@ namespace Keybrd.Pages
             if (sender == ChipFocus) AppConfig.Update(c => c.FocusMode = on);
             else if (sender == ChipLine) AppConfig.Update(c => c.SingleLine = on);
             else if (sender == ChipHide) AppConfig.Update(c => c.AutoHideKeyboard = on);
+            else if (sender == ChipFix) AppConfig.Update(c => c.FixMode = on);
             else if (sender == ChipVoice) ToggleVoice(on);
             else if (sender == ChipFingers) AppConfig.Update(c => c.ShowFingerColors = on);
             else if (sender == ChipAlt) AppConfig.Update(c => c.ShowAltLetters = on);
@@ -130,6 +133,7 @@ namespace Keybrd.Pages
             {
                 Mastery.Update(session, masteryPos, checkpoint);
                 masteryPos = checkpoint;
+                session.Floor = masteryPos;   // оцінене вже не стирається
             }
 
             string fresh = DynamicTrainer.Fresh(lesson.Layout);
@@ -164,7 +168,7 @@ namespace Keybrd.Pages
                 : sameText && session != null && session.Layout == lesson.Layout
                 ? session.Text
                 : ExerciseGenerator.Generate(lesson);
-            session = new TypingSession(text, lesson.Layout);
+            session = new TypingSession(text, lesson.Layout) { FixMode = AppConfig.Current.FixMode };
             lastPassed = false;
             displayStart = 0;
             masteryPos = 0;
@@ -356,6 +360,19 @@ namespace Keybrd.Pages
             // Ctrl/Alt-комбінації — це гарячі клавіші програми, а не набір.
             if ((Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Alt)) != 0) return;
 
+            if (id == KeyboardLayout.Backspace)
+            {
+                // Режим виправлення: Backspace стирає останній символ.
+                if (session.Backspace())
+                {
+                    cleanStreak = 0;
+                    Render();
+                    UpdateStats();
+                    UpdateHint();
+                }
+                return;
+            }
+
             bool caps = Keyboard.IsKeyToggled(Key.CapsLock);
             var ch = KeyboardLayout.CharFor(session.Layout, id, lShift || rShift, caps);
             if (ch == null) return;
@@ -387,6 +404,11 @@ namespace Keybrd.Pages
             Kbd.Flash(id, result != TypeResult.Wrong);
             if (result == TypeResult.Wrong && AppConfig.Current.Sound) Sounds.Error();
             if (result == TypeResult.Wrong) DebugLog.Write("ERR", $"{session.Pos}	{session.Current}");
+            if (result == TypeResult.Wrong && session.FixMode)
+            {
+                note = "Помилка: зітріть її клавішею Backspace і наберіть правильно";
+                notePos = session.Pos;
+            }
             cleanStreak = result == TypeResult.Wrong ? 0 : cleanStreak + 1;
             if (IsEndless)
             {
@@ -409,10 +431,10 @@ namespace Keybrd.Pages
 
         // ---------- відображення ----------
 
-        /// <summary>Стиль символу: 0 — набраний, 1 — набраний з помилкою, 2 — поточний, 3 — ще попереду, 4 — пробіл попереду.</summary>
+        /// <summary>Стиль символу: 0 — набраний, 1 — набраний з помилкою, 2 — поточний, 3 — ще попереду, 4 — пробіл попереду, 5 — невиправлена помилка.</summary>
         private int StyleAt(int i)
         {
-            if (i < session.Pos) return session.HadError[i] ? 1 : 0;
+            if (i < session.Pos) return session.Wrong[i] ? 5 : session.HadError[i] ? 1 : 0;
             if (i == session.Pos) return 2;
             return session.Text[i] == ' ' ? 4 : 3;
         }
@@ -491,6 +513,11 @@ namespace Keybrd.Pages
                     run.SetResourceReference(TextElement.ForegroundProperty, "AccentFgBrush");
                     currentRun = run;
                 }
+                else if (style == 5)
+                {
+                    run.SetResourceReference(TextElement.BackgroundProperty, "ErrorBrush");
+                    run.SetResourceReference(TextElement.ForegroundProperty, "AccentFgBrush");
+                }
                 else
                 {
                     // У біжучому рядку набране лишається добре видимим (сіре, але не бліде).
@@ -505,7 +532,9 @@ namespace Keybrd.Pages
                 i = j;
             }
 
-            Kbd.SetTarget(session.Current);
+            // Є невиправлена помилка — підказуємо Backspace замість наступної літери.
+            if (session.Uncorrected > 0) Kbd.SetTargetKey(KeyboardLayout.Backspace);
+            else Kbd.SetTarget(session.Current);
             UpdateProgress();
             Dispatcher.BeginInvoke(new Action(UpdateScroll), DispatcherPriority.Loaded);
         }
@@ -643,6 +672,7 @@ namespace Keybrd.Pages
             ResultDetails.Text =
                 $"{TypingSession.FormatSpeed(session.Cpm, unit)} {TypingSession.SpeedLabel(unit)}  ·  " +
                 $"точність {acc:0.#}%  ·  помилок {session.Errors}  ·  час {TypingSession.FormatTime(session.ElapsedMs)}";
+            if (session.FixMode) ResultDetails.Text += $"  ·  виправлень {session.Corrections}";
             if (session.ShiftOk + session.ShiftWrong > 0)
                 ResultDetails.Text += $"  ·  правильний Shift {session.ShiftOk} з {session.ShiftOk + session.ShiftWrong}";
 
@@ -706,6 +736,11 @@ namespace Keybrd.Pages
         private void UpdateHint()
         {
             if (session == null || session.Finished || onBreak) return;
+            if (session.Uncorrected > 0)
+            {
+                HintText.Text = $"Невиправлених помилок: {session.Uncorrected}. Зітріть до помилки клавішею Backspace (правий мізинець) і наберіть правильно";
+                return;
+            }
             if (Kbd.TargetId == 0 || session.Current == null) { HintText.Text = ""; return; }
 
             var hint = $"Наступна: {KeyboardLayout.DisplayName(session.Current.Value)} — {KeyboardLayout.FingerName(KeyboardLayout.FingerOf(Kbd.TargetId))}";

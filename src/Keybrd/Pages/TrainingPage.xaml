@@ -101,6 +101,8 @@
             <WrapPanel Grid.Row="1" HorizontalAlignment="Right" Margin="0,6,0,0">
                 <ToggleButton x:Name="ChipVoice" Style="{StaticResource Chip}" Content="Голос" Margin="6,0,0,4"
                               ToolTip="Озвучувати текст вправи" Click="Chip_Click"/>
+                <ToggleButton x:Name="ChipFix" Style="{StaticResource Chip}" Content="Backspace" Margin="6,0,0,4"
+                              ToolTip="Помилка друкується, і її треба стерти Backspace та набрати правильно" Click="Chip_Click"/>
                 <ToggleButton x:Name="ChipHide" Style="{StaticResource Chip}" Content="Ховати клавіатуру" Margin="6,0,0,4"
                               ToolTip="Клавіатура згасає, коли немає помилок, і повертається при помилці" Click="Chip_Click"/>
                 <ToggleButton x:Name="ChipLine" Style="{StaticResource Chip}" Content="Один рядок"

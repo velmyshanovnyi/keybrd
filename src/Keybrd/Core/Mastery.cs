@@ -149,16 +149,9 @@ namespace Keybrd.Core
             int done = Math.Min(to < 0 ? s.Pos : Math.Min(to, s.Pos), text.Length);
             from = Math.Max(0, Math.Min(from, done));
 
-            // Час і помилки для кожної позиції тексту.
-            var time = new double[text.Length];
-            var err = new bool[text.Length];
-            int pos = 0;
-            foreach (var st in s.Strokes)
-            {
-                if (pos >= text.Length) break;
-                time[pos] += st.Ms;
-                if (st.Ok) pos++; else err[pos] = true;
-            }
+            // Час і помилки для кожної позиції тексту веде сама вправа (однаково в обох режимах набору).
+            var time = s.TimeAt;
+            var err = s.HadError;
 
             // Власний темп: медіана інтервалів усередині слів.
             var gaps = new List<double>();
