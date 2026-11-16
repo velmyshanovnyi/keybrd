@@ -248,7 +248,7 @@ namespace Keybrd.Pages
             cleanStreak = 0;
             flow = 0;
             // Нова вправа — інша картинка з ротації.
-            Egg.Kind = AppConfig.Current.DebugEgg >= 0 ? AppConfig.Current.DebugEgg : Egg.Kind + 1 + EggRnd.Next(EggView.Count - 1);
+            Egg.Reset(AppConfig.Current.DebugEgg >= 0 ? AppConfig.Current.DebugEgg : Egg.Kind + 1 + EggRnd.Next(EggView.Count - 1));
             spokenUntil = 0;
             note = null;
             errorPos = revealPos = -1;
@@ -388,11 +388,14 @@ namespace Keybrd.Pages
             // Пасхалка проявляється на місці схованої клавіатури: спершу ледь помітно, далі виразніше —
             // що довша серія чистих натискань. Помилка одразу ховає її разом з поверненням клавіатури.
             double egg = c.Eggs && !IsExam ? hidden * (0.12 + 0.68 * Math.Min(1, flow / 150.0)) : 0;
-            Egg.Update(flow, session?.Cpm ?? 0, session?.Rhythm ?? 0);
+            Egg.SetDynamics(session?.Cpm ?? 0, session?.Rhythm ?? 0);
+            // Поки пасхалку не видно, вона не малюється взагалі.
+            if (egg > 0 && Egg.Visibility != Visibility.Visible) { Egg.Visibility = Visibility.Visible; Egg.InvalidateVisual(); }
             if (instant || egg < Egg.Opacity)
             {
                 Egg.BeginAnimation(OpacityProperty, null);
                 Egg.Opacity = egg;
+                if (egg <= 0) Egg.Visibility = Visibility.Collapsed;
             }
             else Egg.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(egg, TimeSpan.FromMilliseconds(600)));
 
@@ -530,6 +533,7 @@ namespace Keybrd.Pages
             }
             cleanStreak = result == TypeResult.Wrong ? 0 : cleanStreak + 1;
             flow = result == TypeResult.Wrong ? flow * 0.5 : flow + 1;   // помилка відкидає «потік» наполовину, а не до нуля
+            Egg.Add(result == TypeResult.Wrong);                        // фрактал росте на елемент; помилка лишає на ньому хворобу
             lastKeyAt = DateTime.UtcNow;
             TrackErrors(result == TypeResult.Wrong);
             if (IsEndless)
