@@ -114,10 +114,33 @@ namespace Keybrd
                 notes.Add("Файл stats.json був пошкоджений, тому статистику почато заново. Стару копію збережено як stats.bak.json.");
             if (DataStore.UsingFallback)
                 notes.Add($"У папку з програмою не можна записувати, тому налаштування й статистика зберігаються в {DataStore.Dir}.");
-            if (notes.Count == 0) return;
-            InfoText.Text = string.Join("\n", notes);
-            InfoBar.Visibility = Visibility.Visible;
+            if (notes.Count > 0)
+            {
+                InfoText.Text = string.Join("\n", notes);
+                InfoBar.Visibility = Visibility.Visible;
+            }
+            CheckForUpdate();
         }
+
+        /// <summary>У фоні питаємо GitHub про нову версію; якщо вона є — показуємо смужку з кнопкою.</summary>
+        private void CheckForUpdate()
+        {
+            if (!AppConfig.Current.CheckUpdates) return;
+            Updater.Check(found =>
+            {
+                if (found == null) return;
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    string text = $"Є нова версія тренажера: {found} (у вас {Updater.Current}). Завантажте новий Keybrd.exe і замініть ним цей файл — налаштування й статистика збережуться.";
+                    InfoText.Text = InfoBar.Visibility == Visibility.Visible ? InfoText.Text + "\n" + text : text;
+                    InfoAction.Content = "Завантажити";
+                    InfoAction.Visibility = Visibility.Visible;
+                    InfoBar.Visibility = Visibility.Visible;
+                }));
+            });
+        }
+
+        private void InfoAction_Click(object sender, RoutedEventArgs e) => Updater.OpenDownload();
 
         private void InfoClose_Click(object sender, RoutedEventArgs e) => InfoBar.Visibility = Visibility.Collapsed;
 

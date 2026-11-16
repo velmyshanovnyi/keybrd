@@ -55,6 +55,8 @@
                 <Button DockPanel.Dock="Right" Style="{StaticResource CaptionButton}" Width="28" Height="24"
                         Foreground="{DynamicResource InfoFgBrush}" Content="&#xE8BB;" ToolTip="Сховати"
                         Click="InfoClose_Click"/>
+                <Button x:Name="InfoAction" DockPanel.Dock="Right" Style="{StaticResource AccentButton}" Margin="12,0,8,0"
+                        Visibility="Collapsed" Click="InfoAction_Click"/>
                 <TextBlock x:Name="InfoText" Foreground="{DynamicResource InfoFgBrush}" TextWrapping="Wrap"
                            VerticalAlignment="Center"/>
             </DockPanel>

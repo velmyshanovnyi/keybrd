@@ -57,6 +57,8 @@ namespace Keybrd.Core
         public double UnlockAccuracy = 95;
         public bool UnlockAll = false;        // відкрити всі уроки одразу
         public bool Sound = false;               // звук при помилці
+        public bool CheckUpdates = true;         // при старті перевіряти нову версію на GitHub
+        public string DebugUpdateUrl = "";       // прихований: інша адреса файлу версії (тест)
         public bool StrictShift = false;         // Shift тієї ж руки — помилка
         public bool FixMode = false;             // помилки виправляються Backspace
         public int TargetCpm = 150;              // цільовий темп для метронома і бігунка
@@ -187,6 +189,8 @@ namespace Keybrd.Core
             UnlockAccuracy = Json.GetNumber(d, "unlockAccuracy", UnlockAccuracy, 50, 100);
             UnlockAll = Json.GetBool(d, "unlockAll", UnlockAll);
             Sound = Json.GetBool(d, "sound", Sound);
+            CheckUpdates = Json.GetBool(d, "checkUpdates", CheckUpdates);
+            DebugUpdateUrl = Json.GetString(d, "debugUpdateUrl", "");
             StrictShift = Json.GetBool(d, "strictShift", StrictShift);
             FixMode = Json.GetBool(d, "fixMode", FixMode);
             TargetCpm = (int)Json.GetNumber(d, "targetCpm", TargetCpm, 60, 600);
@@ -243,6 +247,7 @@ namespace Keybrd.Core
                 ["unlockAll"] = UnlockAll,
                 ["textFontSize"] = TextFontSize,
                 ["sound"] = Sound,
+                ["checkUpdates"] = CheckUpdates,
                 ["strictShift"] = StrictShift,
                 ["fixMode"] = FixMode,
                 ["targetCpm"] = TargetCpm,

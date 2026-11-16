@@ -103,6 +103,8 @@ namespace Keybrd.Pages
             AccuracyValue.Text = $"{c.UnlockAccuracy:0}%";
             UnlockAll.IsChecked = c.UnlockAll;
             Sound.IsChecked = c.Sound;
+            CheckUpdates.IsChecked = c.CheckUpdates;
+            if (Updater.Newer != null) ShowUpdate(Updater.Newer);
 
             StrictShift.IsChecked = c.StrictShift;
             FixMode.IsChecked = c.FixMode;
@@ -145,6 +147,7 @@ namespace Keybrd.Pages
                 c.SpeedUnit = UnitWpm.IsChecked == true ? "wpm" : "cpm";
                 c.UnlockAll = UnlockAll.IsChecked == true;
                 c.Sound = Sound.IsChecked == true;
+                c.CheckUpdates = CheckUpdates.IsChecked == true;
                 c.StrictShift = StrictShift.IsChecked == true;
                 c.FixMode = FixMode.IsChecked == true;
                 c.Metronome = Metronome.IsChecked == true;
@@ -211,6 +214,25 @@ namespace Keybrd.Pages
             double v = System.Math.Round(e.NewValue);
             AppConfig.Update(c => c.UnlockAccuracy = v);
         }
+
+        // ---------- оновлення ----------
+
+        private void ShowUpdate(System.Version found)
+        {
+            UpdateStatus.Text = found != null
+                ? $"Є нова версія {found} (у вас {Updater.Current}). Завантажте Keybrd.exe і замініть ним поточний файл."
+                : $"У вас найновіша версія ({Updater.Current}) або немає зв’язку з GitHub.";
+            DownloadButton.Visibility = found != null ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void CheckNow_Click(object sender, RoutedEventArgs e)
+        {
+            UpdateStatus.Text = "Перевіряю…";
+            Updater.Check(found => Dispatcher.BeginInvoke(new System.Action(() => ShowUpdate(found))));
+        }
+
+        private void Download_Click(object sender, RoutedEventArgs e) => Updater.OpenDownload();
+        private void OpenRepo_Click(object sender, RoutedEventArgs e) => Updater.OpenRepo();
 
         private void OpenFolder_Click(object sender, RoutedEventArgs e)
         {
