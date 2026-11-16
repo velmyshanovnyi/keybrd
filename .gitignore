@@ -1,0 +1,15 @@
+# Результати збірки
+bin/
+obj/
+dist/
+
+# Дані, які програма створює поруч з exe під час тестів
+config.json
+stats.json
+*.bak.json
+*.tmp
+crash.log
+
+# Середовища розробки
+.vs/
+*.user

@@ -1,0 +1,159 @@
+<UserControl x:Class="Keybrd.Pages.StatsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:Keybrd.Controls">
+    <UserControl.Resources>
+        <Style x:Key="MetricValue" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource DisplayFont}"/>
+            <Setter Property="FontSize" Value="24"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style x:Key="Metric" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="Padding" Value="16,12"/>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+        <StackPanel Margin="0,0,10,0">
+            <!-- Заголовок і фільтри -->
+            <DockPanel Margin="0,0,0,12">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2" Margin="0,0,10,0">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="R7" Style="{StaticResource SegRadio}" GroupName="StatsRange" Content="7 днів" Checked="Range_Checked"/>
+                            <RadioButton x:Name="R30" Style="{StaticResource SegRadio}" GroupName="StatsRange" Content="30 днів" Checked="Range_Checked"/>
+                            <RadioButton x:Name="R90" Style="{StaticResource SegRadio}" GroupName="StatsRange" Content="90 днів" Checked="Range_Checked"/>
+                            <RadioButton x:Name="RAll" Style="{StaticResource SegRadio}" GroupName="StatsRange" Content="Увесь час" Checked="Range_Checked"/>
+                        </StackPanel>
+                    </Border>
+                    <Border BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton x:Name="LayoutUk" Style="{StaticResource SegRadio}" GroupName="StatsLayout" Content="УКР" Checked="Layout_Checked"/>
+                            <RadioButton x:Name="LayoutEn" Style="{StaticResource SegRadio}" GroupName="StatsLayout" Content="LAT" Checked="Layout_Checked"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+                <TextBlock Text="Статистика" Style="{StaticResource SectionTitle}" Margin="0" VerticalAlignment="Center"/>
+            </DockPanel>
+
+            <!-- Підсумки -->
+            <Grid Margin="0,0,-10,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Style="{StaticResource Metric}">
+                    <StackPanel>
+                        <TextBlock Text="остання вправа" Style="{StaticResource Muted}"/>
+                        <TextBlock x:Name="MLast" Style="{StaticResource MetricValue}"/>
+                        <TextBlock x:Name="MLastSub" Style="{StaticResource Muted}"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource Metric}">
+                    <StackPanel>
+                        <TextBlock Text="найкраща швидкість" Style="{StaticResource Muted}"/>
+                        <TextBlock x:Name="MBest" Style="{StaticResource MetricValue}"/>
+                        <TextBlock x:Name="MBestSub" Style="{StaticResource Muted}"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource Metric}">
+                    <StackPanel>
+                        <TextBlock Text="середня за 7 днів" Style="{StaticResource Muted}"/>
+                        <TextBlock x:Name="MAvg" Style="{StaticResource MetricValue}"/>
+                        <TextBlock x:Name="MAvgSub" Style="{StaticResource Muted}"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="3" Style="{StaticResource Metric}">
+                    <StackPanel>
+                        <TextBlock Text="точність за 7 днів" Style="{StaticResource Muted}"/>
+                        <TextBlock x:Name="MAcc" Style="{StaticResource MetricValue}"/>
+                        <TextBlock x:Name="MAccSub" Style="{StaticResource Muted}"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="4" Style="{StaticResource Metric}">
+                    <StackPanel>
+                        <TextBlock Text="час тренувань" Style="{StaticResource Muted}"/>
+                        <TextBlock x:Name="MTime" Style="{StaticResource MetricValue}"/>
+                        <TextBlock x:Name="MTimeSub" Style="{StaticResource Muted}"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Графіки -->
+            <Grid Margin="0,12,-10,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/><ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource Card}" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock x:Name="SpeedTitle" FontWeight="SemiBold"/>
+                        <c:LineChart x:Name="SpeedChart" Height="190" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Text="Точність по днях, %" FontWeight="SemiBold"/>
+                        <c:LineChart x:Name="AccChart" Height="190" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Теплова карта -->
+            <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+                <StackPanel>
+                    <DockPanel>
+                        <Border DockPanel.Dock="Right" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton x:Name="HeatErrors" Style="{StaticResource SegRadio}" GroupName="HeatMode" Content="Помилки" Checked="Heat_Checked"/>
+                                <RadioButton x:Name="HeatSlow" Style="{StaticResource SegRadio}" GroupName="HeatMode" Content="Повільні" Checked="Heat_Checked"/>
+                            </StackPanel>
+                        </Border>
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Text="Теплова карта клавіатури" FontWeight="SemiBold"/>
+                            <TextBlock x:Name="HeatHint" Style="{StaticResource Muted}"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <c:KeyboardView x:Name="Heat" Height="300" Margin="0,12,0,0"/>
+                    <DockPanel Margin="0,10,0,0">
+                        <Button DockPanel.Dock="Right" Style="{StaticResource AccentButton}" Content="Тренувати слабкі місця"
+                                Click="TrainWeak_Click"/>
+                        <TextBlock x:Name="WeakText" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Останні вправи і прогрес курсу -->
+            <Grid Margin="0,12,-10,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource Card}" Margin="0,0,10,0">
+                    <StackPanel>
+                        <TextBlock Text="Останні вправи" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                        <StackPanel x:Name="Recent"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,10,0" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="Прогрес курсу" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="CourseText" Style="{StaticResource MetricValue}" Margin="0,8,0,0"/>
+                        <Grid Height="6" Margin="0,8,0,0">
+                            <Border CornerRadius="3" Background="{DynamicResource TrackBrush}"/>
+                            <Border x:Name="CourseBar" CornerRadius="3" Background="{DynamicResource AccentBrush}" HorizontalAlignment="Left" Width="0"/>
+                        </Grid>
+                        <TextBlock x:Name="CourseSub" Style="{StaticResource Muted}" FontSize="13" Margin="0,8,0,0"/>
+
+                        <Border Height="1" Background="{DynamicResource PanelBorderBrush}" Margin="0,14"/>
+                        <TextBlock Text="Динамічне навчання" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="DynText" Style="{StaticResource MetricValue}" Margin="0,8,0,0"/>
+                        <Grid Height="6" Margin="0,8,0,0">
+                            <Border CornerRadius="3" Background="{DynamicResource TrackBrush}"/>
+                            <Border x:Name="DynBar" CornerRadius="3" Background="{DynamicResource AccentBrush}" HorizontalAlignment="Left" Width="0"/>
+                        </Grid>
+                        <TextBlock x:Name="DynSub" Style="{StaticResource Muted}" FontSize="13" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
