@@ -187,6 +187,30 @@ namespace Keybrd.Core
 
         public double Accuracy => Keystrokes == 0 ? 100 : 100.0 * (Keystrokes - Errors) / Keystrokes;
 
+        /// <summary>
+        /// Рівномірність ритму, 0–100%: 100 − коефіцієнт варіації інтервалів між літерами всередині слів.
+        /// 0 — замало даних (менше 10 інтервалів).
+        /// </summary>
+        public double Rhythm
+        {
+            get
+            {
+                var gaps = new List<double>();
+                bool prevLetter = false;
+                foreach (var st in Strokes)
+                {
+                    bool letter = char.IsLetter(st.Expected) || st.Expected == '\'';
+                    if (st.Ok && letter && prevLetter && st.Ms > 0 && st.Ms < 2000) gaps.Add(st.Ms);
+                    if (st.Ok) prevLetter = letter;
+                }
+                if (gaps.Count < 10) return 0;
+                double mean = gaps.Average();
+                if (mean <= 0) return 0;
+                double sd = Math.Sqrt(gaps.Sum(g => (g - mean) * (g - mean)) / gaps.Count);
+                return Math.Max(1, Math.Min(100, 100 * (1 - sd / mean)));
+            }
+        }
+
         /// <summary>Символи з найбільшою кількістю помилок у цій вправі.</summary>
         public IEnumerable<char> WorstChars(int count)
             => Strokes.Where(s => !s.Ok)

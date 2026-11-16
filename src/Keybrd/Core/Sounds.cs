@@ -7,7 +7,22 @@ namespace Keybrd.Core
     /// <summary>Короткий тихий звук помилки, згенерований у пам'яті (без файлів поруч з exe).</summary>
     public static class Sounds
     {
-        private static SoundPlayer error;
+        private static SoundPlayer error, tick;
+
+        /// <summary>Клац метронома: дуже короткий і тихий.</summary>
+        public static void Tick()
+        {
+            try
+            {
+                if (tick == null)
+                {
+                    tick = new SoundPlayer(Tone(1100, 14, 0.12));
+                    tick.Load();
+                }
+                tick.Play();
+            }
+            catch { }
+        }
 
         public static void Error()
         {

@@ -25,7 +25,8 @@ namespace Keybrd.Pages
         public TrainingPage()
         {
             InitializeComponent();
-            tick.Tick += (s, e) => { UpdateStats(); CheckWindowsLayout(); };
+            tick.Tick += (s, e) => { UpdateStats(); CheckWindowsLayout(); MovePacer(); };
+            metronome.Tick += (s, e) => MetronomeTick();
             Kbd.TargetChanged += UpdateHint;
             SizeChanged += (s, e) => { UpdateProgress(); UpdateScroll(); };
             Loaded += (s, e) =>
@@ -35,6 +36,7 @@ namespace Keybrd.Pages
                 KeyInput.Key += OnKey;
                 KeyInput.ReleaseAll += OnReleaseAll;
                 tick.Start();
+                metronome.Start();
                 Sync();
                 RefreshVoice();
                 SpeakAhead(true);
@@ -46,6 +48,7 @@ namespace Keybrd.Pages
                 KeyInput.Key -= OnKey;
                 KeyInput.ReleaseAll -= OnReleaseAll;
                 tick.Stop();
+                metronome.Stop();
                 FinishEndless(false); // перехід на іншу вкладку завершує урок без зупинки
                 Speech.Stop();
             };
@@ -177,6 +180,8 @@ namespace Keybrd.Pages
             cleanStreak = 0;
             spokenUntil = 0;
             note = null;
+            recent.Clear();
+            slowNoteAt = -1000;
             ScheduleBreak();
 
             if (IsEndless)
@@ -410,6 +415,8 @@ namespace Keybrd.Pages
                 notePos = session.Pos;
             }
             cleanStreak = result == TypeResult.Wrong ? 0 : cleanStreak + 1;
+            lastKeyAt = DateTime.UtcNow;
+            TrackErrors(result == TypeResult.Wrong);
             if (IsEndless)
             {
                 // Текст не закінчується: щойно лишається мало — дописуємо наступну порцію.
@@ -428,6 +435,55 @@ namespace Keybrd.Pages
         // Коротка порада під клавіатурою (не той Shift, «сповільніться»): видно ще кільканадцять знаків.
         private string note;
         private int notePos;
+
+        // ---------- темп: метроном, бігунок, «сповільніться» ----------
+
+        private readonly DispatcherTimer metronome = new DispatcherTimer(DispatcherPriority.Send) { Interval = TimeSpan.FromMilliseconds(400) };
+        private DateTime lastKeyAt = DateTime.MinValue;
+        private readonly System.Collections.Generic.Queue<bool> recent = new System.Collections.Generic.Queue<bool>();
+        private int slowNoteAt = -1000;   // на якому натисканні востаннє радили сповільнитись
+        private int pacerIndex = -1;
+
+        private bool Typing => session != null && session.Started && !session.Finished && !onBreak;
+
+        /// <summary>Клац у цільовому темпі, поки людина друкує (після 3 секунд тиші замовкає).</summary>
+        private void MetronomeTick()
+        {
+            var c = AppConfig.Current;
+            var interval = TimeSpan.FromMilliseconds(60000.0 / Math.Max(60, c.TargetCpm));
+            if (metronome.Interval != interval) metronome.Interval = interval;
+            if (!c.Metronome || !Typing || (DateTime.UtcNow - lastKeyAt).TotalSeconds > 3) return;
+            Sounds.Tick();
+            metronomeTicks++;
+        }
+        private int metronomeTicks;
+
+        /// <summary>Де зараз має бути курсор за цільового темпу; -1 — бігунок вимкнено.</summary>
+        private int PacerTarget()
+        {
+            if (!AppConfig.Current.Pacer || !Typing) return -1;
+            int i = (int)(session.ElapsedMs * AppConfig.Current.TargetCpm / 60000.0);
+            return i < session.Text.Length ? i : -1;
+        }
+
+        private void MovePacer()
+        {
+            int i = PacerTarget();
+            if (i == pacerIndex) return;
+            Render();
+        }
+
+        /// <summary>Якщо серед останніх 30 натискань 4+ помилки — радимо зменшити темп.</summary>
+        private void TrackErrors(bool wrong)
+        {
+            recent.Enqueue(wrong);
+            while (recent.Count > 30) recent.Dequeue();
+            if (!wrong || recent.Count(x => x) < 4 || session.Keystrokes - slowNoteAt < 40) return;
+            slowNoteAt = session.Keystrokes;
+            note = "Забагато помилок — сповільніться: спершу точність, швидкість прийде сама";
+            notePos = session.Pos;
+            DebugLog.Write("SLOW", session.Pos.ToString());
+        }
 
         // ---------- відображення ----------
 
@@ -495,14 +551,17 @@ namespace Keybrd.Pages
                 }
             }
 
+            // Бігунок темпу: підкреслений символ, до якого ви мали б дійти за цільової швидкості.
+            int pacer = pacerIndex = PacerTarget();
+
             int i = displayStart;
             while (i < text.Length)
             {
                 int style = StyleAt(i);
                 int level = fade == null ? 0 : fade[i];
                 int j = i + 1;
-                if (style != 2)
-                    while (j < text.Length && StyleAt(j) == style && (fade == null || fade[j] == level)) j++;
+                if (style != 2 && i != pacer)
+                    while (j < text.Length && j != pacer && StyleAt(j) == style && (fade == null || fade[j] == level)) j++;
 
                 var sb = new StringBuilder();
                 for (int k = i; k < j; k++) sb.Append(Display(text[k]));
@@ -528,6 +587,7 @@ namespace Keybrd.Pages
                     if (level == 0) run.SetResourceReference(TextElement.ForegroundProperty, key);
                     else run.Foreground = Faded(key, level);
                 }
+                if (i == pacer) run.TextDecorations = PacerMark();
                 target.Inlines.Add(run);
                 i = j;
             }
@@ -537,6 +597,19 @@ namespace Keybrd.Pages
             else Kbd.SetTarget(session.Current);
             UpdateProgress();
             Dispatcher.BeginInvoke(new Action(UpdateScroll), DispatcherPriority.Loaded);
+        }
+
+        private TextDecorationCollection PacerMark()
+        {
+            var brush = TryFindResource("AccentBrush") as System.Windows.Media.Brush ?? System.Windows.Media.Brushes.DodgerBlue;
+            var d = new TextDecoration
+            {
+                Location = TextDecorationLocation.Underline,
+                Pen = new System.Windows.Media.Pen(brush, 3),
+                PenThicknessUnit = TextDecorationUnit.Pixel,
+                PenOffset = 3, PenOffsetUnit = TextDecorationUnit.Pixel,
+            };
+            return new TextDecorationCollection { d };
         }
 
         private static readonly double[] FadeOpacity = { 1, 0.5, 0.25, 0.1 };
@@ -672,7 +745,9 @@ namespace Keybrd.Pages
             ResultDetails.Text =
                 $"{TypingSession.FormatSpeed(session.Cpm, unit)} {TypingSession.SpeedLabel(unit)}  ·  " +
                 $"точність {acc:0.#}%  ·  помилок {session.Errors}  ·  час {TypingSession.FormatTime(session.ElapsedMs)}";
+            if (session.Rhythm > 0) ResultDetails.Text += $"  ·  рівномірність {session.Rhythm:0}%";
             if (session.FixMode) ResultDetails.Text += $"  ·  виправлень {session.Corrections}";
+            if (AppConfig.Current.Metronome) DebugLog.Write("METRONOME", metronomeTicks.ToString());
             if (session.ShiftOk + session.ShiftWrong > 0)
                 ResultDetails.Text += $"  ·  правильний Shift {session.ShiftOk} з {session.ShiftOk + session.ShiftWrong}";
 

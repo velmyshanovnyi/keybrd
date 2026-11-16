@@ -11,6 +11,8 @@ namespace Keybrd.Core
         public DateTime Ts;
         public string Layout, Lesson;
         public double DurationSec, Cpm, Accuracy;
+        /// <summary>Рівномірність ритму 0–100; 0 — не виміряно.</summary>
+        public double Rhythm;
         public int Chars, Errors;
         public bool Passed;
     }
@@ -35,7 +37,7 @@ namespace Keybrd.Core
     public sealed class DayStat
     {
         public DateTime Day;
-        public double Cpm, Accuracy, Minutes;
+        public double Cpm, Accuracy, Minutes, Rhythm;
         public int Sessions;
     }
 
@@ -126,6 +128,7 @@ namespace Keybrd.Core
                         Cpm = g.Sum(s => s.Cpm * Math.Max(1, s.Chars)) / chars,
                         Accuracy = g.Sum(s => s.Accuracy * Math.Max(1, s.Chars)) / chars,
                         Minutes = g.Sum(s => s.DurationSec) / 60,
+                        Rhythm = g.Where(s => s.Rhythm > 0).Select(s => s.Rhythm).DefaultIfEmpty(0).Average(),
                         Sessions = g.Count(),
                     };
                 })
@@ -179,6 +182,7 @@ namespace Keybrd.Core
                 {
                     Ts = s.StartedAt, Layout = s.Layout, Lesson = l.Id, DurationSec = Math.Round(sec, 1),
                     Chars = s.Pos, Errors = s.Errors, Cpm = Math.Round(s.Cpm), Accuracy = Math.Round(s.Accuracy, 1), Passed = passed,
+                    Rhythm = Math.Round(s.Rhythm),
                 });
             }
 
@@ -230,6 +234,7 @@ namespace Keybrd.Core
                             Errors = (int)Json.GetNumber(d, "errors", 0),
                             Cpm = Json.GetNumber(d, "cpm", 0),
                             Accuracy = Json.GetNumber(d, "accuracy", 0),
+                            Rhythm = Json.GetNumber(d, "rhythm", 0),
                             Passed = Json.GetBool(d, "passed", false),
                         });
                     }
@@ -328,6 +333,7 @@ namespace Keybrd.Core
                 ["cpm"] = s.Cpm,
                 ["accuracy"] = s.Accuracy,
                 ["passed"] = s.Passed,
+                ["rhythm"] = s.Rhythm,
             }).ToList();
 
             var lessons = new Dictionary<string, object>();

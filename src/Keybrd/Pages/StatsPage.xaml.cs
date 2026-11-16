@@ -138,6 +138,24 @@ namespace Keybrd.Pages
             InsightReview();
             InsightConfusion();
             InsightShift();
+            InsightRhythm();
+        }
+
+        private void InsightRhythm()
+        {
+            var all = StatsStore.SessionsOf(Layout).Where(s => s.Rhythm > 0).ToList();
+            if (all.Count == 0) return;
+            var p = InsightCard("Ритм",
+                "Рівномірність — наскільки однакові паузи між літерами всередині слів. Рівний ритм важливіший за ривки: від 70% — добре, нижче 50% — ви друкуєте поривами.");
+            var last = all[all.Count - 1];
+            var week = all.Where(s => s.Ts >= DateTime.Today.AddDays(-6)).ToList();
+            var before = all.Where(s => s.Ts < DateTime.Today.AddDays(-6)).ToList();
+            string line = $"Остання вправа: {last.Rhythm:0}%";
+            if (week.Count > 0) line += $"   ·   за 7 днів: {week.Average(s => s.Rhythm):0}%";
+            if (before.Count > 0) line += $"   ·   раніше: {before.Average(s => s.Rhythm):0}%";
+            Line(p, line);
+            var c = AppConfig.Current;
+            Line(p, $"Цільовий темп: {SpeedL(c.TargetCpm)}. Метроном {(c.Metronome ? "увімкнено" : "вимкнено")}, бігунок темпу {(c.Pacer ? "увімкнено" : "вимкнено")} — змінюється в налаштуваннях.", true);
         }
 
         private void InsightShift()
