@@ -365,6 +365,32 @@ namespace Keybrd.Pages
 
         private int cleanStreak;   // скільки клавіш поспіль натиснуто без помилки
         private double flow;       // «потік»: росте з кожним чистим натисканням, від нього ростуть пасхалки
+        private DateTime eggFlashUntil = DateTime.MinValue;
+
+        /// <summary>
+        /// Помилка: на секунду показуємо пасхалку поверх клавіатури, щоб було видно, що саме зараз
+        /// на ній зламалось, і плавно прибираємо. Клавіатура з підсвіченою клавішею лишається під нею.
+        /// </summary>
+        private void FlashEgg()
+        {
+            var c = AppConfig.Current;
+            if (!c.Eggs || !c.AutoHideKeyboard || IsExam || session == null || session.Finished) return;
+            eggFlashUntil = DateTime.UtcNow.AddMilliseconds(1700);
+            Egg.Visibility = Visibility.Visible;
+            Egg.InvalidateVisual();
+            var anim = new System.Windows.Media.Animation.DoubleAnimationUsingKeyFrames();
+            anim.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(0.92, System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(90))));
+            anim.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(0.92, System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1000))));
+            anim.KeyFrames.Add(new System.Windows.Media.Animation.LinearDoubleKeyFrame(0, System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(1700))));
+            var started = eggFlashUntil;
+            anim.Completed += (s, e) =>
+            {
+                if (eggFlashUntil != started) return;   // за цей час сталась нова помилка або почалась нова вправа
+                eggFlashUntil = DateTime.MinValue;
+                ApplyKeyboardOpacity(false);
+            };
+            Egg.BeginAnimation(OpacityProperty, anim);
+        }
         private static readonly Random EggRnd = new Random();
 
         /// <summary>
@@ -389,15 +415,21 @@ namespace Keybrd.Pages
             // що довша серія чистих натискань. Помилка одразу ховає її разом з поверненням клавіатури.
             double egg = c.Eggs && !IsExam ? hidden * (0.12 + 0.68 * Math.Min(1, flow / 150.0)) : 0;
             Egg.SetDynamics(session?.Cpm ?? 0, session?.Rhythm ?? 0);
+            if (DateTime.UtcNow < eggFlashUntil && !instant) egg = -1;   // триває показ помилки — прозорість веде він
+            if (egg < 0) { }
+            else
             // Поки пасхалку не видно, вона не малюється взагалі.
-            if (egg > 0 && Egg.Visibility != Visibility.Visible) { Egg.Visibility = Visibility.Visible; Egg.InvalidateVisual(); }
-            if (instant || egg < Egg.Opacity)
             {
-                Egg.BeginAnimation(OpacityProperty, null);
-                Egg.Opacity = egg;
-                if (egg <= 0) Egg.Visibility = Visibility.Collapsed;
+                if (instant) eggFlashUntil = DateTime.MinValue;
+                if (egg > 0 && Egg.Visibility != Visibility.Visible) { Egg.Visibility = Visibility.Visible; Egg.InvalidateVisual(); }
+                if (instant || egg < Egg.Opacity)
+                {
+                    Egg.BeginAnimation(OpacityProperty, null);
+                    Egg.Opacity = egg;
+                    if (egg <= 0) Egg.Visibility = Visibility.Collapsed;
+                }
+                else Egg.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(egg, TimeSpan.FromMilliseconds(600)));
             }
-            else Egg.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(egg, TimeSpan.FromMilliseconds(600)));
 
             if (instant)
             {
@@ -534,6 +566,7 @@ namespace Keybrd.Pages
             cleanStreak = result == TypeResult.Wrong ? 0 : cleanStreak + 1;
             flow = result == TypeResult.Wrong ? flow * 0.5 : flow + 1;   // помилка відкидає «потік» наполовину, а не до нуля
             Egg.Add(result == TypeResult.Wrong);                        // фрактал росте на елемент; помилка лишає на ньому хворобу
+            if (result == TypeResult.Wrong) FlashEgg();
             lastKeyAt = DateTime.UtcNow;
             TrackErrors(result == TypeResult.Wrong);
             if (IsEndless)

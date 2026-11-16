@@ -65,7 +65,8 @@ namespace Keybrd.Controls
         {
             if (error) { errors.Add(count); errorList.Add(count); }
             count++;
-            if (Visibility == Visibility.Visible) InvalidateVisual();
+            // Ілюзії не ростуть: їх перемальовуємо лише тоді, коли з'явився новий дефект.
+            if (Visibility == Visibility.Visible && (error || kind >= FirstFractal)) InvalidateVisual();
         }
 
         /// <summary>Форма фракталів залежить від швидкості й рівномірності набору.</summary>
@@ -135,7 +136,7 @@ namespace Keybrd.Controls
             double u = r * 0.82;   // робочий радіус усередині тла
             switch (kind)
             {
-                case 0: Rings(dc, c, new[] { u * 0.78, u * 0.98 }, u * 0.062, 18, 4); break;
+                case 0: Rings(dc, c, new[] { u * 0.80, u * 0.98 }, u * 0.05, 14, 6); break;
                 case 1: Rings(dc, c, new[] { u * 0.30, u * 0.47, u * 0.64, u * 0.81, u * 0.98 }, u * 0.055, 24, 0); break;
                 case 2: CafeWall(dc, c, u); break;
                 case 3: Grid(dc, c, u); break;
@@ -155,14 +156,25 @@ namespace Keybrd.Controls
         /// Кола з чорно-білих рисок, нахилених до дотичної. Якщо нахил змінює знак групами (group &gt; 0),
         /// рівні кола здаються хвилястими й переплетеними; якщо нахил сталий — концентричні кола здаються спіраллю.
         /// </summary>
+        /// <remarks>
+        /// У «переплетених кільцях» group — це кількість перегинів на коло: нахил рисок змінює знак
+        /// стільки разів, а на сусідньому кільці перегини зсунуті на півкроку. Тому око не може
+        /// простежити жодне кільце до кінця: вони ніби перетинаються, рухаються, і їх здається більше.
+        /// </remarks>
         private void Rings(DrawingContext dc, Point c, double[] radii, double thick, double tilt, int group)
         {
             var counts = new int[radii.Length];
+            var groups = new int[radii.Length];
             int total = 0;
             for (int ri = 0; ri < radii.Length; ri++)
             {
-                int n = Math.Max(16, (int)(2 * Math.PI * radii[ri] / (thick * 1.25)) / 2 * 2);
-                if (group > 0) n = n / (group * 2) * (group * 2);
+                // Риски майже квадратні — тоді коло лишається рівним, а «скручений шнур» дає сам нахил.
+                int n = Math.Max(16, (int)(2 * Math.PI * radii[ri] / (thick * (group > 0 ? 1.05 : 1.25))) / 2 * 2);
+                if (group > 0)
+                {
+                    groups[ri] = Math.Max(2, n / (group * 2) / 2 * 2 + 1);   // непарна кількість рисок у групі: кольори на межі не зливаються
+                    n = groups[ri] * group * 2;
+                }
                 counts[ri] = n;
                 total += n;
             }
@@ -176,7 +188,9 @@ namespace Keybrd.Controls
                 for (int k = 0; k < n; k++, index++)
                 {
                     double a = 360.0 * k / n;
-                    double t = group > 0 ? (((k / group) + ri) % 2 == 0 ? tilt : -tilt) : (ri % 2 == 0 ? tilt : -tilt);
+                    double t = group > 0
+                        ? ((((k + (ri % 2) * groups[ri] / 2) / groups[ri]) % 2 == 0) ? tilt : -tilt)
+                        : (ri % 2 == 0 ? tilt : -tilt);
                     bool sick = bad.Contains(index);
                     if (sick) t += 70;   // збита риска стоїть майже поперек кола
                     dc.PushTransform(new RotateTransform(a, c.X, c.Y));
@@ -289,32 +303,74 @@ namespace Keybrd.Controls
         /// Кільця, що «обертаються»: сегменти йдуть у порядку чорний — синій — білий — жовтий,
         /// і боковим зором здається, що сусідні кільця повільно крутяться в різні боки.
         /// </summary>
+        /// <remarks>
+        /// Ефект (периферичний дрейф) тримається на трьох речах, і всі три тут дотримано:
+        ///   • нерівний порядок яскравості в кожній ланці: вузька чорна — широка синя — вузька біла — широка жовта;
+        ///   • сусідні кільця й сусідні диски закручені в протилежні боки;
+        ///   • дисків кілька: рух видно в тих, на які не дивишся прямо.
+        /// </remarks>
         private void Snakes(DrawingContext dc, Point c, double u)
         {
-            Brush[] cycle = { Dark, Blue, Light, Yellow };
-            int rings = 5;
-            double width = u / (rings + 0.6);
-            var counts = new int[rings];
-            int total = 0;
-            for (int ri = 0; ri < rings; ri++) { counts[ri] = 12 + ri * 8; total += counts[ri]; }
-            var bad = Defects(total);
-            int index = 0;
-            for (int ri = 0; ri < rings; ri++)
+            // Сім дисків: один у центрі й шість довкола.
+            double R = u * 0.36;
+            var centers = new List<Point> { c };
+            for (int i = 0; i < 6; i++)
             {
-                double rad = width * (ri + 1.1);
-                int n = counts[ri];
-                for (int k = 0; k < n; k++, index++)
+                double a = Math.PI / 3 * i + Math.PI / 6;
+                centers.Add(new Point(c.X + Math.Cos(a) * R * 1.95, c.Y + Math.Sin(a) * R * 1.95));
+            }
+            const int rings = 4;
+            int[] units = { 6, 9, 12, 15 };               // ланок у кільці, від внутрішнього до зовнішнього
+            int perDisc = 6 + 9 + 12 + 15;
+            var bad = Defects(perDisc * centers.Count);
+            Brush[] cycle = { Dark, Blue, Light, Yellow };
+            double[] share = { 1, 2.2, 1, 2.2 };          // ширини сегментів ланки
+            double sum = share[0] + share[1] + share[2] + share[3];
+
+            for (int d = 0; d < centers.Count; d++)
+            {
+                var o = centers[d];
+                dc.DrawEllipse(Mid, null, o, R, R);
+                int index = d * perDisc;
+                for (int ri = 0; ri < rings; ri++)
                 {
-                    bool sick = bad.Contains(index);
-                    int order = ri % 2 == 0 ? k : n - 1 - k;   // сусідні кільця — у різні боки
-                    double a0 = 2 * Math.PI * k / n, a1 = 2 * Math.PI * (k + 1) / n;
-                    double rr = sick ? rad + width * 0.3 : rad;   // хворий сегмент випав з кільця
-                    var pen = new Pen(sick ? Sick : cycle[order % 4], width * 0.78);
-                    pen.Freeze();
-                    dc.DrawLine(pen, new Point(c.X + Math.Cos(a0) * rr, c.Y + Math.Sin(a0) * rr),
-                                     new Point(c.X + Math.Cos(a1) * rr, c.Y + Math.Sin(a1) * rr));
+                    double r0 = R * (0.16 + 0.84 * ri / rings), r1 = R * (0.16 + 0.84 * (ri + 1) / rings) - R * 0.012;
+                    int n = units[ri];
+                    bool clockwise = (ri + d) % 2 == 0;
+                    for (int k = 0; k < n; k++, index++)
+                    {
+                        bool sick = bad.Contains(index);
+                        double a = 2 * Math.PI * k / n, step = 2 * Math.PI / n;
+                        double at = 0;
+                        for (int s = 0; s < 4; s++)
+                        {
+                            double w = share[s] / sum * step;
+                            double a0 = clockwise ? a + at : a + step - at - w;
+                            // Хвора ланка: кольори в ній переплутано, і вона червона — «змія» в цьому місці зупиняється.
+                            var brush = sick ? (s % 2 == 0 ? Sick : SickDim) : cycle[s];
+                            dc.DrawGeometry(brush, null, Sector(o, r0, r1, a0, a0 + w));
+                            at += w;
+                        }
+                    }
                 }
             }
+        }
+
+        /// <summary>Сектор кільця між радіусами r0 і r1 та кутами a0 і a1 (радіани).</summary>
+        private static Geometry Sector(Point o, double r0, double r1, double a0, double a1)
+        {
+            Point P(double r, double a) => new Point(o.X + Math.Cos(a) * r, o.Y + Math.Sin(a) * r);
+            var g = new StreamGeometry();
+            using (var s = g.Open())
+            {
+                s.BeginFigure(P(r0, a0), true, true);
+                s.LineTo(P(r1, a0), false, false);
+                s.ArcTo(P(r1, a1), new Size(r1, r1), 0, false, SweepDirection.Clockwise, false, false);
+                s.LineTo(P(r0, a1), false, false);
+                s.ArcTo(P(r0, a0), new Size(r0, r0), 0, false, SweepDirection.Counterclockwise, false, false);
+            }
+            g.Freeze();
+            return g;
         }
 
         // ---------- фрактали: один елемент на натискання ----------
