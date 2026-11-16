@@ -362,6 +362,25 @@ namespace Keybrd.Core
             return Build(head, Next, l.Length);
         }
 
+        // ---------- контрольний тест ----------
+
+        private static readonly Dictionary<string, Queue<string>> ExamQueue = new Dictionary<string, Queue<string>>();
+
+        /// <summary>Наступні речення контрольного тесту: усі речення по колу у випадковому порядку.</summary>
+        public static string ExamChunk(string layout, int length)
+        {
+            if (!ExamQueue.TryGetValue(layout, out var q)) ExamQueue[layout] = q = new Queue<string>();
+            var sb = new StringBuilder();
+            while (sb.Length < length)
+            {
+                if (q.Count == 0) foreach (var s in Sentences(layout).OrderBy(_ => Rnd.Next())) q.Enqueue(s);
+                if (q.Count == 0) return FreeText(Course.Free(layout));
+                if (sb.Length > 0) sb.Append(' ');
+                sb.Append(NormalizeCustom(q.Dequeue(), layout));
+            }
+            return sb.ToString();
+        }
+
         // ---------- плутанина ----------
 
         /// <summary>

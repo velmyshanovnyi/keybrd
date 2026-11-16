@@ -25,7 +25,7 @@ namespace Keybrd.Pages
         public TrainingPage()
         {
             InitializeComponent();
-            tick.Tick += (s, e) => { UpdateStats(); CheckWindowsLayout(); MovePacer(); };
+            tick.Tick += (s, e) => { UpdateStats(); CheckWindowsLayout(); MovePacer(); StreamTick(); };
             metronome.Tick += (s, e) => MetronomeTick();
             Kbd.TargetChanged += UpdateHint;
             SizeChanged += (s, e) => { UpdateProgress(); UpdateScroll(); };
@@ -35,6 +35,8 @@ namespace Keybrd.Pages
                 ThemeManager.Changed += OnThemeChanged;
                 KeyInput.Key += OnKey;
                 KeyInput.ReleaseAll += OnReleaseAll;
+                StatsStore.Changed += UpdateDayInfo;
+                UpdateDayInfo();
                 tick.Start();
                 metronome.Start();
                 Sync();
@@ -47,6 +49,7 @@ namespace Keybrd.Pages
                 ThemeManager.Changed -= OnThemeChanged;
                 KeyInput.Key -= OnKey;
                 KeyInput.ReleaseAll -= OnReleaseAll;
+                StatsStore.Changed -= UpdateDayInfo;
                 tick.Stop();
                 metronome.Stop();
                 FinishEndless(false); // перехід на іншу вкладку завершує урок без зупинки
@@ -118,7 +121,57 @@ namespace Keybrd.Pages
 
         // ---------- урок без зупинки ----------
 
-        private bool IsEndless => lesson != null && lesson.Kind == LessonKind.Endless;
+        /// <summary>Уроки, де текст дописується на ходу: без зупинки, щоденне заняття, контрольний тест.</summary>
+        private bool IsEndless => lesson != null && (lesson.Kind == LessonKind.Endless || lesson.Kind == LessonKind.Daily || lesson.Kind == LessonKind.Exam);
+        private bool IsDaily => lesson != null && lesson.Kind == LessonKind.Daily;
+        private bool IsExam => lesson != null && lesson.Kind == LessonKind.Exam;
+
+        // Щоденне заняття і контрольний тест тривають обмежений час.
+        private double limitMs = double.MaxValue;
+        private int phase;
+        private static readonly string[] PhaseNames = { "розминка", "повторення", "нове", "швидкість" };
+
+        private void UpdateDayInfo() => DayInfo.Text = StatsStore.DaySummary();
+
+        /// <summary>Наступна порція тексту для уроку, що дописується на ходу.</summary>
+        private string NextChunk(bool first)
+        {
+            string lay = lesson.Layout;
+            if (IsExam) return ExerciseGenerator.ExamChunk(lay, lesson.Length);
+            if (IsDaily)
+            {
+                double part = session == null || first ? 0 : session.ElapsedMs / limitMs;
+                phase = part < 0.10 ? 0 : part < 0.35 ? 1 : part < 0.80 ? 2 : 3;
+                DebugLog.Write("PHASE", $"{phase}\t{PhaseNames[phase]}");
+                if (phase == 0) return DynamicTrainer.WarmUp(lay, 90);
+                if (phase == 1) return DynamicTrainer.ReviewText(lay, 100);
+                if (phase == 3) return DynamicTrainer.SpeedText(lay, 100);
+            }
+            string fresh = DynamicTrainer.Fresh(lay);
+            bool intro = first || fresh != lastFresh;   // розминка — лише коли з'явилась нова літера
+            lastFresh = fresh;
+            // Порція з новою літерою коротша: швидше видно, чи літера закріпилась, і можна відкривати наступну.
+            return DynamicTrainer.Generate(lay, intro && !first ? 80 : lesson.Length, intro);
+        }
+
+        private string StreamName()
+        {
+            if (IsExam) return $"контрольний тест · {AppConfig.Current.ExamMinutes} хв";
+            if (IsDaily)
+            {
+                double left = Math.Max(0, limitMs - (session?.ElapsedMs ?? 0));
+                return $"щоденне заняття · {PhaseNames[phase]} · лишилось {TypingSession.FormatTime(left)}";
+            }
+            return "без зупинки · " + DynamicTrainer.Status(lesson.Layout);
+        }
+
+        /// <summary>Раз на чверть секунди: оновити залишок часу; контрольний тест зупиняється рівно за часом.</summary>
+        private void StreamTick()
+        {
+            if (!(IsDaily || IsExam) || !Typing) return;
+            ExerciseName.Text = StreamName();
+            if (IsExam && session.ElapsedMs >= limitMs) FinishEndless(true);
+        }
 
         /// <summary>Вікно закривається: зберегти незавершений урок без зупинки.</summary>
         public void SaveUnfinished() => FinishEndless(false);
@@ -139,15 +192,11 @@ namespace Keybrd.Pages
                 session.Floor = masteryPos;   // оцінене вже не стирається
             }
 
-            string fresh = DynamicTrainer.Fresh(lesson.Layout);
-            bool intro = fresh != lastFresh;   // розминка — лише коли з'явилась нова літера
-            lastFresh = fresh;
-            // Порція з новою літерою коротша: швидше видно, чи літера закріпилась, і можна відкривати наступну.
-            string chunk = DynamicTrainer.Generate(lesson.Layout, intro ? 80 : lesson.Length, intro);
+            string chunk = NextChunk(false);
             session.Append(" " + chunk);
             DebugLog.Write("APPEND", chunk);
             DebugLog.Write("STATE", DynamicTrainer.Status(lesson.Layout) + $" | слів {DynamicTrainer.MasteredWords(lesson.Layout)}, відомих {DynamicTrainer.KnownWords(lesson.Layout)}");
-            ExerciseName.Text = "без зупинки · " + DynamicTrainer.Status(lesson.Layout);
+            ExerciseName.Text = StreamName();
         }
 
         /// <summary>Завершити урок без зупинки: дооцінити набране й записати вправу в статистику.</summary>
@@ -167,7 +216,13 @@ namespace Keybrd.Pages
         {
             FinishEndless(false); // незавершений урок без зупинки не має пропасти
 
-            var text = IsEndless ? DynamicTrainer.Generate(lesson.Layout, lesson.Length, true)
+            var c0 = AppConfig.Current;
+            limitMs = IsDaily ? Math.Max(Math.Min(3, c0.DailyGoal), c0.DailyGoal - StatsStore.MinutesToday) * 60000.0
+                    : IsExam ? c0.ExamMinutes * 60000.0
+                    : double.MaxValue;
+            phase = 0;
+            lastFresh = "";
+            var text = IsEndless ? NextChunk(true)
                 : sameText && session != null && session.Layout == lesson.Layout
                 ? session.Text
                 : ExerciseGenerator.Generate(lesson);
@@ -189,7 +244,7 @@ namespace Keybrd.Pages
                 lastFresh = DynamicTrainer.Fresh(lesson.Layout);
                 startWords = DynamicTrainer.MasteredWords(lesson.Layout);
                 startLetters = DynamicTrainer.Letters(lesson.Layout).Length;
-                ExerciseName.Text = "без зупинки · " + DynamicTrainer.Status(lesson.Layout);
+                ExerciseName.Text = StreamName();
             }
             else if (lesson.Kind == LessonKind.Dynamic)
             {
@@ -253,7 +308,8 @@ namespace Keybrd.Pages
 
         private void ScheduleBreak()
         {
-            int minutes = AppConfig.Current.BreakMinutes;
+            // Перерви — лише в уроці без зупинки; заняття з обмеженим часом закінчуються самі.
+            int minutes = lesson.Kind == LessonKind.Endless ? AppConfig.Current.BreakMinutes : 0;
             nextBreakMs = minutes > 0 ? session.ElapsedMs + minutes * 60000.0 : double.MaxValue;
         }
 
@@ -290,6 +346,8 @@ namespace Keybrd.Pages
         {
             var c = AppConfig.Current;
             double value = c.FocusMode ? 0.35 : 1;
+            // Контрольний тест — без клавіатури на екрані.
+            if (IsExam && session != null && !session.Finished) value = 0;
             if (c.AutoHideKeyboard && session != null && !session.Finished && !onBreak)
             {
                 double factor = cleanStreak < 8 ? 1 : Math.Max(0, 1 - (cleanStreak - 8) / 20.0);
@@ -423,6 +481,8 @@ namespace Keybrd.Pages
                 if (session.Text.Length - session.Pos < 40) ExtendEndless();
                 // Блок часу вийшов — зупиняємось після щойно завершеного слова.
                 if (result != TypeResult.Wrong && ch == " " && session.ElapsedMs >= nextBreakMs) StartBreak();
+                // Щоденне заняття: ціль виконано — завершуємо після щойно набраного слова.
+                if (IsDaily && result != TypeResult.Wrong && ch == " " && session.ElapsedMs >= limitMs) FinishEndless(false);
             }
             else if (result == TypeResult.Finished) lastPassed = StatsStore.Record(session, lesson);
             Render();
@@ -593,7 +653,8 @@ namespace Keybrd.Pages
             }
 
             // Є невиправлена помилка — підказуємо Backspace замість наступної літери.
-            if (session.Uncorrected > 0) Kbd.SetTargetKey(KeyboardLayout.Backspace);
+            if (IsExam) Kbd.SetTarget(null);
+            else if (session.Uncorrected > 0) Kbd.SetTargetKey(KeyboardLayout.Backspace);
             else Kbd.SetTarget(session.Current);
             UpdateProgress();
             Dispatcher.BeginInvoke(new Action(UpdateScroll), DispatcherPriority.Loaded);
@@ -720,6 +781,13 @@ namespace Keybrd.Pages
             SpeedLabel.Text = TypingSession.SpeedLabel(unit);
             StatSpeed.Text = session.Started && session.Pos > 0 ? TypingSession.FormatSpeed(session.Cpm, unit) : "—";
             StatAcc.Text = session.Started ? Math.Floor(session.Accuracy) + "%" : "—";
+            if (IsExam && !session.Finished)
+            {
+                // У контрольному тесті показуємо, скільки часу лишилось.
+                StatErr.Text = session.Errors.ToString();
+                StatTime.Text = TypingSession.FormatTime(Math.Max(0, limitMs - session.ElapsedMs));
+                return;
+            }
             StatErr.Text = session.Errors.ToString();
             StatTime.Text = TypingSession.FormatTime(session.ElapsedMs);
         }
@@ -731,7 +799,13 @@ namespace Keybrd.Pages
             double acc = session.Accuracy;
             var next = Course.Next(lesson);
 
-            if (IsEndless)
+            if (IsExam)
+                ResultTitle.Text = session.ElapsedMs >= limitMs
+                    ? $"Контрольний тест: {TypingSession.FormatSpeed(session.Cpm, unit)} {TypingSession.SpeedLabel(unit)}, точність {acc:0.#}%"
+                    : "Контрольний тест перервано — результат записано як неповний";
+            else if (IsDaily)
+                ResultTitle.Text = session.ElapsedMs >= limitMs ? "Щоденне заняття виконано" : "Заняття перервано — його можна продовжити";
+            else if (IsEndless)
                 ResultTitle.Text = onBreak
                     ? $"{TypingSession.FormatTime(session.ElapsedMs)} позаду — перепочиньте. Продовжити далі?"
                     : $"Набрано {session.Pos} знаків за {TypingSession.FormatTime(session.ElapsedMs)}";
@@ -759,7 +833,13 @@ namespace Keybrd.Pages
                 if (lesson.MinCpm > 0) need += $" і швидкість від {TypingSession.FormatSpeed(lesson.MinCpm, unit)} {TypingSession.SpeedLabel(unit)}";
                 worstText = need + ".  " + worstText;
             }
-            if (IsEndless)
+            if (IsExam)
+            {
+                var exams = StatsStore.Exams(lesson.Layout);
+                var best = exams.OrderByDescending(s => s.Cpm).FirstOrDefault();
+                worstText = (best != null ? $"Тестів: {exams.Count}, найкращий: {TypingSession.FormatSpeed(best.Cpm, unit)} {TypingSession.SpeedLabel(unit)} ({best.Ts:dd.MM.yyyy}).  " : "") + worstText;
+            }
+            else if (IsEndless)
             {
                 // Підсумок усього заходу: що відкрилось і що стало вивченим від його початку.
                 string lay = lesson.Layout;
@@ -775,6 +855,7 @@ namespace Keybrd.Pages
                 if (fresh.Length > 0) parts.Add("ще закріплюємо: " + string.Join(" ", fresh.Select(DynamicTrainer.SymbolName)));
                 var focus = DynamicTrainer.Focus(lay);
                 if (focus.Count > 0) parts.Add("на донавчанні: " + string.Join(", ", focus));
+                if (IsDaily) parts.Insert(0, char.ToUpper(StatsStore.DaySummary()[0]) + StatsStore.DaySummary().Substring(1).TrimEnd('.'));
                 worstText = string.Join(".  ", parts) + ".  " + worstText;
             }
             else if (lesson.Kind == LessonKind.Dynamic)
@@ -796,10 +877,12 @@ namespace Keybrd.Pages
             ResultWorst.Text = worstText;
 
             // Урок без зупинки: на перерві — «Продовжити далі» і «Завершити»; після завершення — лише «Продовжити далі».
-            NextLabel.Text = IsEndless ? "Продовжити далі" : lastPassed && next != null ? "Наступний урок" : "Новий текст";
+            NextLabel.Text = IsExam ? "Пройти ще раз" : IsDaily ? "Ще одне заняття" : IsEndless ? "Продовжити далі" : lastPassed && next != null ? "Наступний урок" : "Новий текст";
             RestartLabel.Text = onBreak ? "Завершити" : "Ще раз";
             RestartButton.Visibility = IsEndless && !onBreak ? Visibility.Collapsed : Visibility.Visible;
             HintText.Text = onBreak ? "Enter — продовжити далі, Esc — завершити урок"
+                : IsExam ? "Enter — пройти тест ще раз"
+                : IsDaily ? "Enter — ще одне заняття"
                 : IsEndless ? "Enter — продовжити далі"
                 : lastPassed && next != null
                 ? "Enter — наступний урок, Esc — повторити цей текст"
@@ -811,6 +894,11 @@ namespace Keybrd.Pages
         private void UpdateHint()
         {
             if (session == null || session.Finished || onBreak) return;
+            if (IsExam)
+            {
+                HintText.Text = "Контрольний тест: клавіатуру й підказки приховано   ·   Esc — перервати";
+                return;
+            }
             if (session.Uncorrected > 0)
             {
                 HintText.Text = $"Невиправлених помилок: {session.Uncorrected}. Зітріть до помилки клавішею Backspace (правий мізинець) і наберіть правильно";
@@ -888,7 +976,11 @@ namespace Keybrd.Pages
         {
             if (session == null || !(ProgressFill.Parent is FrameworkElement track)) return;
             double part = session.Text.Length == 0 ? 0 : (double)session.Pos / session.Text.Length;
-            if (IsEndless && !session.Finished)
+            if ((IsDaily || IsExam) && !session.Finished)
+            {
+                part = Math.Max(0, Math.Min(1, session.ElapsedMs / limitMs));   // смужка — це час
+            }
+            else if (IsEndless && !session.Finished)
             {
                 // Кінця немає, тому смужка показує, скільки лишилось до відкриття наступної літери
                 // (найслабша з літер «у роботі»), а коли всі літери відкрито — рівень складності слів.

@@ -372,6 +372,66 @@ namespace Keybrd.Core
             return sb.ToString();
         }
 
+        // ---------- фази щоденного заняття ----------
+
+        private static List<string> AllowedWords(string layout)
+        {
+            string letters = Letters(layout);
+            return Ordered(layout).Where(w => w.All(c => letters.IndexOf(c) >= 0)).ToList();
+        }
+
+        /// <summary>Текст потрібної довжини: спершу обов'язкові слова, далі випадкові з набору без повторів поспіль.</summary>
+        private static string Fill(IEnumerable<string> first, List<string> pool, int length)
+        {
+            var sb = new StringBuilder();
+            string prev = null;
+            foreach (var w in first) { if (sb.Length > 0) sb.Append(' '); sb.Append(w); prev = w; }
+            int guard = 0;
+            while (sb.Length < length && pool.Count > 0 && guard++ < 400)
+            {
+                var w = pool[Rnd.Next(pool.Count)];
+                if (w == prev && pool.Count > 1) continue;
+                if (sb.Length > 0) sb.Append(' ');
+                sb.Append(w);
+                prev = w;
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>Розминка: найпростіші з уже вивчених слів. Поки їх мало — звичайна порція навчання.</summary>
+        public static string WarmUp(string layout, int length)
+        {
+            var words = Mastery.WordsOf(layout);
+            var pool = AllowedWords(layout).Where(w => words.TryGetValue(w, out var it) && it.Mastered).Take(60).ToList();
+            return pool.Count < 6 ? Generate(layout, length, true) : Fill(new string[0], pool, length);
+        }
+
+        /// <summary>Повторення: слова, яким настав час перевірки, слабкі слова, слова зі слабкими сполученнями і з літерами, які плутаються.</summary>
+        public static string ReviewText(string layout, int length)
+        {
+            var allowed = AllowedWords(layout);
+            var due = Review(layout, allowed, length * 2 / 3);
+            var pool = new List<string>(due);
+            pool.AddRange(Mastery.WeakWords(layout, 6).Where(allowed.Contains));
+            foreach (var g in Focus(layout)) pool.AddRange(allowed.Where(w => w.Contains(g)).Take(3));
+            foreach (var p in Confusions.LetterPairs(layout, 2))
+            {
+                pool.AddRange(allowed.Where(w => w.IndexOf(p.Expected) >= 0).Take(3));
+                pool.AddRange(allowed.Where(w => w.IndexOf(p.Typed) >= 0).Take(3));
+            }
+            pool = pool.Distinct().ToList();
+            return pool.Count < 4 ? Generate(layout, length, false) : Fill(due.OrderBy(_ => Rnd.Next()), pool, length);
+        }
+
+        /// <summary>Швидкість: короткі слова, які вже в пальцях, — їх можна друкувати на межі свого темпу.</summary>
+        public static string SpeedText(string layout, int length)
+        {
+            var words = Mastery.WordsOf(layout);
+            var grams = Mastery.GramsOf(layout);
+            var pool = AllowedWords(layout).Where(w => w.Length <= 6 && IsKnown(w, words, grams)).Take(150).ToList();
+            return pool.Count < 8 ? Generate(layout, length, false) : Fill(new string[0], pool, length);
+        }
+
         /// <summary>Слова на повторення сьогодні: ті, чий час настав, і по одному слову на кожне сполучення на перевірці.</summary>
         public static List<string> Review(string layout, List<string> allowed, int maxChars)
         {

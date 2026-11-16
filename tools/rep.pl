@@ -22,7 +22,7 @@ while (@sections) {
   for my $blk (split /^#####\n/m, $body) {
     next unless $blk =~ /\S/;
     my ($old, $new) = split /^=====>\n/m, $blk, 2; die "bad block in $file\n" unless defined $new;
-    chomp $old; chomp $new; $n++;
+    $old =~ s/\n\z//; $new =~ s/\n\z//; $n++;
     my $c = () = $text{$file} =~ /\Q$old\E/g;
     die "block $n: found $c times in $file:\n$old\n" unless $c == 1;
     my $pos = index($text{$file}, $old);

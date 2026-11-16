@@ -135,6 +135,8 @@ namespace Keybrd.Pages
         private void BuildInsights()
         {
             Insights.Children.Clear();
+            InsightDay();
+            InsightExams();
             InsightReview();
             InsightConfusion();
             InsightShift();
@@ -156,6 +158,37 @@ namespace Keybrd.Pages
             Line(p, line);
             var c = AppConfig.Current;
             Line(p, $"Цільовий темп: {SpeedL(c.TargetCpm)}. Метроном {(c.Metronome ? "увімкнено" : "вимкнено")}, бігунок темпу {(c.Pacer ? "увімкнено" : "вимкнено")} — змінюється в налаштуваннях.", true);
+        }
+
+        private void InsightDay()
+        {
+            var c = AppConfig.Current;
+            double min = StatsStore.MinutesToday;
+            var p = InsightCard("Щоденна практика", "Короткі заняття щодня дають більше, ніж довгі зрідка. День зараховується в серію від 5 хвилин.");
+            Line(p, min >= c.DailyGoal
+                ? $"Сьогодні: {min:0} хв — денну ціль {c.DailyGoal} хв виконано."
+                : $"Сьогодні: {Math.Floor(min):0} з {c.DailyGoal} хв.");
+            Line(p, $"Серія: {StatsStore.Streak()} дн. поспіль   ·   найдовша: {StatsStore.BestStreak()} дн.");
+            ActionButton(p, "Почати щоденне заняття", "daily");
+        }
+
+        private void InsightExams()
+        {
+            var exams = StatsStore.Exams(Layout);
+            if (exams.Count == 0) return;
+            var p = InsightCard("Контрольні тести", "Замір на звичайному тексті без клавіатури на екрані й без підказок.");
+            var best = exams.OrderByDescending(s => s.Cpm).First();
+            var first = exams[0];
+            var last = exams[exams.Count - 1];
+            Line(p, $"Останній: {SpeedL(last.Cpm)}, точність {last.Accuracy:0.#}%   ·   найкращий: {SpeedL(best.Cpm)} ({best.Ts:dd.MM.yyyy})");
+            if (exams.Count > 1)
+            {
+                double diff = Unit == "wpm" ? (last.Cpm - first.Cpm) / 5 : last.Cpm - first.Cpm;
+                Line(p, $"Від першого тесту ({first.Ts:dd.MM.yyyy}): {(diff >= 0 ? "+" : "−")}{Math.Abs(Math.Round(diff))} {TypingSession.SpeedLabel(Unit)}, тестів: {exams.Count}.");
+            }
+            foreach (var s in Enumerable.Reverse(exams).Take(5))
+                Line(p, $"{s.Ts:dd.MM.yyyy HH:mm}   ·   {Math.Round(s.DurationSec / 60):0} хв   ·   {SpeedL(s.Cpm)}   ·   {s.Accuracy:0.#}%" + (s.Rhythm > 0 ? $"   ·   ритм {s.Rhythm:0}%" : ""), true);
+            ActionButton(p, "Пройти контрольний тест", "exam");
         }
 
         private void InsightShift()

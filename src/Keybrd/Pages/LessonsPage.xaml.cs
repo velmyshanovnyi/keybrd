@@ -68,12 +68,14 @@ namespace Keybrd.Pages
         {
             List.Children.Clear();
             AddHeader("Практика");
+            AddRow(Course.Daily(Layout));
             AddRow(Course.Endless(Layout));
             AddRow(Course.Dynamic(Layout));
             AddRow(Course.Free(Layout));
             AddRow(Course.Weak(Layout));
             AddRow(Course.Confusion(Layout));
             AddRow(Course.Custom(Layout));
+            AddRow(Course.Exam(Layout));
 
             int stage = 0;
             foreach (var l in course)
@@ -179,6 +181,8 @@ namespace Keybrd.Pages
             StartButton.Content = isPassed ? "Пройти ще раз" : "Почати урок";
             var prev = Course.Previous(l);
             DLock.Text = dyn ? DynamicSummary(l.Layout, keys.Length > 0)
+                : l.Kind == LessonKind.Daily ? Capital(StatsStore.DaySummary()) + "."
+                : l.Kind == LessonKind.Exam ? ExamSummary(l.Layout)
                 : l.Kind == LessonKind.Confusion && keys.Length == 0
                 ? "Стійких пар поки немає: пара з’являється після трьох однакових помилок. Зараз вправа складатиметься з частих слів."
                 : l.Kind == LessonKind.Confusion ? "Зараз у роботі ці пари: потрібна літера → та, яку ви натискаєте замість неї."
@@ -201,6 +205,20 @@ namespace Keybrd.Pages
                     CustomInput.Text = AppConfig.Current.EffectiveCustomText(Layout);
                 UpdateCustomInfo();
             }
+        }
+
+        private static string Capital(string s) => s.Length == 0 ? s : char.ToUpper(s[0]) + s.Substring(1);
+
+        private static string ExamSummary(string layout)
+        {
+            var unit = AppConfig.Current.SpeedUnit;
+            var exams = StatsStore.Exams(layout);
+            string duration = $"Тривалість: {AppConfig.Current.ExamMinutes} хв.";
+            if (exams.Count == 0) return duration + " Тестів ще не було.";
+            var best = exams.OrderByDescending(s => s.Cpm).First();
+            var last = exams[exams.Count - 1];
+            return $"{duration} Тестів: {exams.Count}. Останній: {TypingSession.FormatSpeed(last.Cpm, unit)} {TypingSession.SpeedLabel(unit)}, {last.Accuracy:0.#}%. " +
+                   $"Найкращий: {TypingSession.FormatSpeed(best.Cpm, unit)} {TypingSession.SpeedLabel(unit)} ({best.Ts:dd.MM.yyyy}).";
         }
 
         private static string DynamicSummary(string layout, bool hasFocus)

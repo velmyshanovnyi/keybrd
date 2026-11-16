@@ -59,6 +59,59 @@ namespace Keybrd.Core
 
         public static int[] ShiftOf(string layout) => Shift.TryGetValue(layout, out var v) ? v : new int[2];
 
+        // ---------- день і серія ----------
+
+        /// <summary>Сьогодні (з урахуванням прихованого зсуву для тестів).</summary>
+        public static DateTime Today => DateTime.Today.AddDays(AppConfig.Current.DebugDayOffset);
+
+        /// <summary>Хвилин тренування за день, обома розкладками разом.</summary>
+        public static double MinutesOn(DateTime day) => Sessions.Where(s => s.Ts.Date == day).Sum(s => s.DurationSec) / 60;
+
+        public static double MinutesToday => MinutesOn(Today);
+
+        /// <summary>Від скількох хвилин день вважається днем заняття.</summary>
+        public static double ActiveMinutes => Math.Min(5, AppConfig.Current.DailyGoal);
+
+        private static HashSet<DateTime> ActiveDays()
+            => new HashSet<DateTime>(Sessions.GroupBy(s => s.Ts.Date)
+                .Where(g => g.Sum(s => s.DurationSec) / 60 >= ActiveMinutes - 0.01).Select(g => g.Key));
+
+        /// <summary>Днів поспіль із заняттям. Якщо сьогодні ще не займалися, серія рахується по вчора.</summary>
+        public static int Streak()
+        {
+            var days = ActiveDays();
+            var d = Today;
+            if (!days.Contains(d)) d = d.AddDays(-1);
+            int n = 0;
+            while (days.Contains(d)) { n++; d = d.AddDays(-1); }
+            return n;
+        }
+
+        public static int BestStreak()
+        {
+            int best = 0, run = 0;
+            DateTime prev = DateTime.MinValue;
+            foreach (var d in ActiveDays().OrderBy(x => x))
+            {
+                run = d == prev.AddDays(1) ? run + 1 : 1;
+                best = Math.Max(best, run);
+                prev = d;
+            }
+            return best;
+        }
+
+        public static string DaySummary()
+        {
+            int goal = AppConfig.Current.DailyGoal;
+            double min = MinutesToday;
+            string today = min >= goal ? $"сьогодні {min:0} хв — ціль {goal} хв виконано" : $"сьогодні {Math.Floor(min):0} з {goal} хв";
+            int streak = Streak();
+            return streak > 0 ? $"{today} · серія {streak} дн." : today;
+        }
+
+        /// <summary>Контрольні тести розкладки, від найдавнішого.</summary>
+        public static List<SessionRecord> Exams(string layout) => Sessions.Where(s => s.Lesson == layout + "-exam").ToList();
+
         public static bool WasReset { get; private set; }
         public static event Action Changed;
 
@@ -180,7 +233,7 @@ namespace Keybrd.Core
             {
                 Sessions.Add(new SessionRecord
                 {
-                    Ts = s.StartedAt, Layout = s.Layout, Lesson = l.Id, DurationSec = Math.Round(sec, 1),
+                    Ts = s.StartedAt.AddDays(AppConfig.Current.DebugDayOffset), Layout = s.Layout, Lesson = l.Id, DurationSec = Math.Round(sec, 1),
                     Chars = s.Pos, Errors = s.Errors, Cpm = Math.Round(s.Cpm), Accuracy = Math.Round(s.Accuracy, 1), Passed = passed,
                     Rhythm = Math.Round(s.Rhythm),
                 });

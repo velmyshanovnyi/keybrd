@@ -115,6 +115,16 @@ namespace Keybrd.Core
             "Програма запам’ятовує, яку клавішу ви натискаєте замість потрібної. Ця вправа ставить такі літери поруч: " +
             "по черзі, у контрастних складах і в словах з кожною з них, щоб пальці навчилися їх розрізняти.", 190);
 
+        public static Lesson Daily(string layout) => Practice(layout, "daily", LessonKind.Daily, "Щоденне заняття",
+            "Готове заняття на день: розминка на вивчених словах, повторення того, чому настав час, нові слова і наприкінці — " +
+            "швидкість на тому, що вже в пальцях. Триває, доки не виконано денну ціль (її можна змінити в налаштуваннях), і завершується саме. " +
+            "Короткі заняття щодня дають більше, ніж довгі зрідка.", 110);
+
+        public static Lesson Exam(string layout) => Practice(layout, "exam", LessonKind.Exam, "Контрольний тест",
+            "Чесний замір: звичайні речення, які не підлаштовуються під вас, без клавіатури на екрані й без підказок. " +
+            "Триває 1, 3 або 5 хвилин (змінюється в налаштуваннях) і зупиняється сам. Результати зберігаються окремо, " +
+            "щоб порівнювати себе з собою місяць тому.", 120);
+
         public static Lesson Find(string id)
         {
             if (string.IsNullOrEmpty(id)) return null;
@@ -125,6 +135,8 @@ namespace Keybrd.Core
             if (id.EndsWith("-dynamic")) return Dynamic(layout);
             if (id.EndsWith("-endless")) return Endless(layout);
             if (id.EndsWith("-confusion")) return Confusion(layout);
+            if (id.EndsWith("-daily")) return Daily(layout);
+            if (id.EndsWith("-exam")) return Exam(layout);
             return For(layout).FirstOrDefault(l => l.Id == id);
         }
 

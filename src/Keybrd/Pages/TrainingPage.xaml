@@ -22,6 +22,8 @@
                                          Content="LAT" ToolTip="Латиниця (Ctrl+L)" Checked="Layout_Checked"/>
                         </StackPanel>
                     </Border>
+                    <TextBlock x:Name="DayInfo" DockPanel.Dock="Right" Style="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,16,0"
+                               ToolTip="Скільки хвилин ви тренувалися сьогодні і скільки днів поспіль займаєтесь"/>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Style="{StaticResource Muted}" Margin="0,0,24,0" VerticalAlignment="Center">
                             <Run x:Name="SpeedLabel" Text="зн/хв"/> <Run x:Name="StatSpeed" Text="—" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
