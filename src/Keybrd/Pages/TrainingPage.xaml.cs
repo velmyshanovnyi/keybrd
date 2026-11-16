@@ -36,6 +36,7 @@ namespace Keybrd.Pages
                 KeyInput.Key += OnKey;
                 KeyInput.ReleaseAll += OnReleaseAll;
                 StatsStore.Changed += UpdateDayInfo;
+                System.Windows.Media.CompositionTarget.Rendering += TickerFrame;
                 UpdateDayInfo();
                 tick.Start();
                 metronome.Start();
@@ -50,6 +51,7 @@ namespace Keybrd.Pages
                 KeyInput.Key -= OnKey;
                 KeyInput.ReleaseAll -= OnReleaseAll;
                 StatsStore.Changed -= UpdateDayInfo;
+                System.Windows.Media.CompositionTarget.Rendering -= TickerFrame;
                 tick.Stop();
                 metronome.Stop();
                 FinishEndless(false); // перехід на іншу вкладку завершує урок без зупинки
@@ -598,7 +600,8 @@ namespace Keybrd.Pages
 
         private static string Display(char c)
         {
-            if (c == ' ') return "·​";                       // крапка + невидимий розрив рядка
+            // Пробіл: крапка з вузькими нерозривними відступами з обох боків (слова стоять вільніше) + невидимий розрив рядка.
+            if (c == ' ') return " · ​";
             if (KeyboardLayout.IsSpecial(c)) return " " + KeyboardLayout.SpecialName(c) + " ​";
             return c.ToString();
         }
@@ -670,8 +673,9 @@ namespace Keybrd.Pages
                 var run = new Run(sb.ToString());
                 if (style == 2)
                 {
-                    run.SetResourceReference(TextElement.BackgroundProperty, session.HadError[i] ? "ErrorBrush" : "AccentBrush");
-                    run.SetResourceReference(TextElement.ForegroundProperty, "AccentFgBrush");
+                    // Поточна літера виділена м'яко: напівпрозоре тло і звичайний колір тексту, щоб не «кричала».
+                    run.Background = Soft(session.HadError[i] ? "ErrorBrush" : "AccentBrush", session.HadError[i] ? 0.45 : 0.30);
+                    run.SetResourceReference(TextElement.ForegroundProperty, "FgBrush");
                     currentRun = run;
                 }
                 else if (style == 5)
@@ -718,6 +722,16 @@ namespace Keybrd.Pages
         /// <summary>Диктант: літери й знаки ще не набраного тексту замінено крапками, пробіли видно.</summary>
         private static string Mask(char c) => c == ' ' ? Display(c) : "•";
 
+        /// <summary>Колір теми з заданою прозорістю (для м'якого тла поточної літери).</summary>
+        private System.Windows.Media.Brush Soft(string key, double opacity)
+        {
+            var color = (TryFindResource(key) as System.Windows.Media.SolidColorBrush)?.Color ?? System.Windows.Media.Colors.Gray;
+            color.A = (byte)(255 * opacity);
+            var b = new System.Windows.Media.SolidColorBrush(color);
+            b.Freeze();
+            return b;
+        }
+
         private static readonly double[] FadeOpacity = { 1, 0.5, 0.25, 0.1 };
 
         /// <summary>Колір теми з прозорістю для далеких слів біжучого рядка.</summary>
@@ -755,22 +769,35 @@ namespace Keybrd.Pages
             Canvas.SetTop(TickerText, Math.Max(0, (TickerHost.Height - TickerText.ActualHeight) / 2));
 
             double center = (start.Left + end.Right) / 2;
-            double x = Math.Round(TickerHost.ActualWidth / 2 - center);
+            tickerTarget = Math.Round(TickerHost.ActualWidth / 2 - center);
             bool jump = tickerSession != session || session.Pos == 0;
             tickerSession = session;
             if (jump)
             {
-                TickerShift.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, null);
-                TickerShift.X = x;
+                tickerX = tickerTarget;
+                TickerShift.X = tickerX;
             }
-            else
-            {
-                var anim = new System.Windows.Media.Animation.DoubleAnimation(x, TimeSpan.FromMilliseconds(110))
-                {
-                    EasingFunction = new System.Windows.Media.Animation.QuadraticEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut },
-                };
-                TickerShift.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, anim);
-            }
+            // Інакше рядок сам плавно доїжджає до нового місця — див. TickerFrame.
+        }
+
+        // Плавний рух біжучого рядка. Замість окремого ривка на кожну літеру рядок безперервно
+        // «пливе» до потрібного місця: за рівного набору він рухається майже з постійною швидкістю,
+        // а не смикається від літери до літери.
+        private double tickerTarget, tickerX;
+        private TimeSpan tickerFrameAt;
+        private const double TickerSmoothSec = 0.22;   // більше — плавніше, але рядок більше відстає
+
+        private void TickerFrame(object sender, EventArgs e)
+        {
+            var now = ((System.Windows.Media.RenderingEventArgs)e).RenderingTime;
+            double dt = Math.Min(0.1, (now - tickerFrameAt).TotalSeconds);
+            tickerFrameAt = now;
+            if (TickerHost.Visibility != Visibility.Visible || dt <= 0) return;
+            double diff = tickerTarget - tickerX;
+            if (diff == 0) return;
+            if (Math.Abs(diff) < 0.4) tickerX = tickerTarget;
+            else tickerX += diff * (1 - Math.Exp(-dt / TickerSmoothSec));
+            TickerShift.X = tickerX;
         }
 
         /// <summary>
