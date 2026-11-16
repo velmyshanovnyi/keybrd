@@ -125,6 +125,15 @@ namespace Keybrd.Pages
         private bool IsEndless => lesson != null && (lesson.Kind == LessonKind.Endless || lesson.Kind == LessonKind.Daily || lesson.Kind == LessonKind.Exam);
         private bool IsDaily => lesson != null && lesson.Kind == LessonKind.Daily;
         private bool IsExam => lesson != null && lesson.Kind == LessonKind.Exam;
+        private bool IsDictation => lesson != null && lesson.Kind == LessonKind.Dictation;
+        /// <summary>Диктант з голосом: ще не набраний текст приховано.</summary>
+        private bool Masked => IsDictation && voiceAvailable;
+        private bool VoiceOn => AppConfig.Current.Voice || IsDictation;
+
+        // Диктант: після трьох помилок на одному місці літера відкривається.
+        private int errorPos = -1, errorCount, revealPos = -1;
+        private string placementSummary;
+        private bool PlacementMoved => placementSummary != null && AppConfig.Current.LessonFor(lesson.Layout) != lesson.Id;
 
         // Щоденне заняття і контрольний тест тривають обмежений час.
         private double limitMs = double.MaxValue;
@@ -235,6 +244,9 @@ namespace Keybrd.Pages
             cleanStreak = 0;
             spokenUntil = 0;
             note = null;
+            errorPos = revealPos = -1;
+            errorCount = 0;
+            placementSummary = null;
             recent.Clear();
             slowNoteAt = -1000;
             ScheduleBreak();
@@ -276,6 +288,8 @@ namespace Keybrd.Pages
             switch (lesson.Kind)
             {
                 case LessonKind.Adaptive: return "слабкі місця";
+                case LessonKind.Placement: return "вступний тест";
+                case LessonKind.Dictation: return "диктант";
                 case LessonKind.Confusion:
                     var pairs = Confusions.LetterPairs(lesson.Layout, 3);
                     return pairs.Count > 0 ? "плутанина · " + string.Join(", ", pairs.Select(p => p.Text)) : "плутанина · стійких пар поки немає";
@@ -286,6 +300,12 @@ namespace Keybrd.Pages
 
         private void GoNext()
         {
+            // Після вступного тесту, який щось змінив, Enter веде до першого незарахованого уроку курсу.
+            if (lesson.Kind == LessonKind.Placement && PlacementMoved)
+            {
+                AppConfig.Update(c => { });   // Sync завантажить урок, який обрав тест
+                return;
+            }
             var next = lastPassed ? Course.Next(lesson) : null;
             if (next != null) AppConfig.Update(c => c.SetLesson(next.Id)); // Sync створить нову вправу
             else NewSession(false);
@@ -374,7 +394,7 @@ namespace Keybrd.Pages
         /// </summary>
         private void SpeakAhead(bool force)
         {
-            if (!AppConfig.Current.Voice || session == null || session.Finished || onBreak) return;
+            if (!VoiceOn || session == null || session.Finished || onBreak) return;
             if (!force && session.Pos < spokenUntil) return;
 
             var text = session.Text;
@@ -392,6 +412,7 @@ namespace Keybrd.Pages
             for (int k = start; k < end; k++)
                 sb.Append(KeyboardLayout.IsSpecial(text[k]) ? " " + KeyboardLayout.SpecialName(text[k]) + " " : text[k].ToString());
             Speech.Say(sb.ToString(), session.Layout);
+            DebugLog.Write("SAY", sb.ToString());
         }
 
         private void OnKey(int id, bool down, bool repeat)
@@ -406,6 +427,11 @@ namespace Keybrd.Pages
                 // В уроці без зупинки Esc завершує його і показує підсумок; в інших — починає вправу заново.
                 if (IsEndless && session.Started && !session.Finished) FinishEndless(true);
                 else NewSession(true);
+                return;
+            }
+            if (IsDictation && id == KeyboardLayout.Tab && !session.Finished)
+            {
+                SpeakAhead(true);   // Tab — повторити фразу від поточного місця
                 return;
             }
             if (onBreak)
@@ -462,7 +488,14 @@ namespace Keybrd.Pages
                 }
             }
 
+            int typedAt = session.Pos;
             var result = session.Type(ch, badShift && AppConfig.Current.StrictShift);
+            if (result == TypeResult.Wrong)
+            {
+                errorCount = errorPos == typedAt ? errorCount + 1 : 1;
+                errorPos = typedAt;
+                if (errorCount >= 3) revealPos = typedAt;
+            }
             if (result == TypeResult.Ignored) return;
             Kbd.Flash(id, result != TypeResult.Wrong);
             if (result == TypeResult.Wrong && AppConfig.Current.Sound) Sounds.Error();
@@ -484,7 +517,15 @@ namespace Keybrd.Pages
                 // Щоденне заняття: ціль виконано — завершуємо після щойно набраного слова.
                 if (IsDaily && result != TypeResult.Wrong && ch == " " && session.ElapsedMs >= limitMs) FinishEndless(false);
             }
-            else if (result == TypeResult.Finished) lastPassed = StatsStore.Record(session, lesson);
+            else if (result == TypeResult.Finished)
+            {
+                lastPassed = StatsStore.Record(session, lesson);
+                if (lesson.Kind == LessonKind.Placement)
+                {
+                    placementSummary = Placement.Apply(session);
+                    DebugLog.Write("PLACEMENT", placementSummary);
+                }
+            }
             Render();
             UpdateStats();
             UpdateHint();
@@ -624,7 +665,8 @@ namespace Keybrd.Pages
                     while (j < text.Length && j != pacer && StyleAt(j) == style && (fade == null || fade[j] == level)) j++;
 
                 var sb = new StringBuilder();
-                for (int k = i; k < j; k++) sb.Append(Display(text[k]));
+                for (int k = i; k < j; k++)
+                    sb.Append(Masked && k >= session.Pos && k != revealPos ? Mask(text[k]) : Display(text[k]));
                 var run = new Run(sb.ToString());
                 if (style == 2)
                 {
@@ -653,7 +695,7 @@ namespace Keybrd.Pages
             }
 
             // Є невиправлена помилка — підказуємо Backspace замість наступної літери.
-            if (IsExam) Kbd.SetTarget(null);
+            if (IsExam || Masked) Kbd.SetTarget(null);
             else if (session.Uncorrected > 0) Kbd.SetTargetKey(KeyboardLayout.Backspace);
             else Kbd.SetTarget(session.Current);
             UpdateProgress();
@@ -672,6 +714,9 @@ namespace Keybrd.Pages
             };
             return new TextDecorationCollection { d };
         }
+
+        /// <summary>Диктант: літери й знаки ще не набраного тексту замінено крапками, пробіли видно.</summary>
+        private static string Mask(char c) => c == ' ' ? Display(c) : "•";
 
         private static readonly double[] FadeOpacity = { 1, 0.5, 0.25, 0.1 };
 
@@ -809,6 +854,8 @@ namespace Keybrd.Pages
                 ResultTitle.Text = onBreak
                     ? $"{TypingSession.FormatTime(session.ElapsedMs)} позаду — перепочиньте. Продовжити далі?"
                     : $"Набрано {session.Pos} знаків за {TypingSession.FormatTime(session.ElapsedMs)}";
+            else if (lesson.Kind == LessonKind.Placement)
+                ResultTitle.Text = "Вступний тест завершено";
             else if (lesson.IsFree)
                 ResultTitle.Text = acc >= 95 ? "Вправу завершено — чудова точність" : "Вправу завершено";
             else if (lastPassed)
@@ -827,6 +874,7 @@ namespace Keybrd.Pages
 
             var worst = session.WorstChars(3).Select(KeyboardLayout.DisplayName).ToList();
             var worstText = worst.Count > 0 ? "Найбільше помилок: " + string.Join(", ", worst) : "Без жодної помилки";
+            if (lesson.Kind == LessonKind.Placement && placementSummary != null) worstText = placementSummary;
             if (!lesson.IsFree && !lastPassed)
             {
                 var need = $"Потрібно: точність від {c.UnlockAccuracy:0}%";
@@ -877,10 +925,11 @@ namespace Keybrd.Pages
             ResultWorst.Text = worstText;
 
             // Урок без зупинки: на перерві — «Продовжити далі» і «Завершити»; після завершення — лише «Продовжити далі».
-            NextLabel.Text = IsExam ? "Пройти ще раз" : IsDaily ? "Ще одне заняття" : IsEndless ? "Продовжити далі" : lastPassed && next != null ? "Наступний урок" : "Новий текст";
+            NextLabel.Text = lesson.Kind == LessonKind.Placement ? (PlacementMoved ? "До уроків курсу" : "Пройти ще раз") : IsExam ? "Пройти ще раз" : IsDaily ? "Ще одне заняття" : IsEndless ? "Продовжити далі" : lastPassed && next != null ? "Наступний урок" : "Новий текст";
             RestartLabel.Text = onBreak ? "Завершити" : "Ще раз";
             RestartButton.Visibility = IsEndless && !onBreak ? Visibility.Collapsed : Visibility.Visible;
             HintText.Text = onBreak ? "Enter — продовжити далі, Esc — завершити урок"
+                : lesson.Kind == LessonKind.Placement ? (PlacementMoved ? "Enter — перейти до уроку курсу, Esc — пройти тест ще раз" : "Enter — пройти тест ще раз")
                 : IsExam ? "Enter — пройти тест ще раз"
                 : IsDaily ? "Enter — ще одне заняття"
                 : IsEndless ? "Enter — продовжити далі"
@@ -897,6 +946,11 @@ namespace Keybrd.Pages
             if (IsExam)
             {
                 HintText.Text = "Контрольний тест: клавіатуру й підказки приховано   ·   Esc — перервати";
+                return;
+            }
+            if (Masked)
+            {
+                HintText.Text = "Диктант: друкуйте на слух   ·   Tab — повторити фразу   ·   після трьох помилок літера відкриється";
                 return;
             }
             if (session.Uncorrected > 0)
@@ -923,7 +977,11 @@ namespace Keybrd.Pages
             if (!ok)
                 notes.Add((session.Layout == "en" ? "Розкладка Windows зараз не англійська." : "Розкладка Windows зараз не українська.")
                     + " Тренажер усе одно правильно зарахує натискання, але для звички перемкніть її (Win+Пробіл або Alt+Shift).");
-            if (AppConfig.Current.Voice && !voiceAvailable)
+            if (IsDictation && !voiceAvailable)
+                notes.Add(session.Layout == "en"
+                    ? "Диктант без голосу: у Windows немає англійського голосу, тому текст показано як звичайно."
+                    : "Диктант без голосу: у Windows немає українського голосу, тому текст показано як звичайно. Як його додати — на вкладці «Налаштування».");
+            else if (AppConfig.Current.Voice && !voiceAvailable)
                 notes.Add(session.Layout == "en"
                     ? "Озвучення не працює: у Windows немає англійського голосу."
                     : "Озвучення не працює: у Windows немає українського голосу. Як його додати — на вкладці «Налаштування».");
@@ -941,7 +999,7 @@ namespace Keybrd.Pages
 
         private void RefreshVoice()
         {
-            voiceAvailable = !AppConfig.Current.Voice || session == null || Speech.Available(session.Layout);
+            voiceAvailable = !VoiceOn || session == null || Speech.Available(session.Layout);
         }
 
         private void ToggleVoice(bool on)

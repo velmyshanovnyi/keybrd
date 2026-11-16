@@ -51,6 +51,8 @@ namespace Keybrd.Core
                 case LessonKind.Adaptive: return Adaptive(l);
                 case LessonKind.Custom: return CustomText(l);
                 case LessonKind.Confusion: return ConfusionText(l);
+                case LessonKind.Placement: return Placement.Text(l.Layout, l.Length);
+                case LessonKind.Dictation: return ExamChunk(l.Layout, l.Length);
                 case LessonKind.Dynamic:
                 case LessonKind.Endless: return DynamicTrainer.Generate(l);
                 default: return FreeText(l);

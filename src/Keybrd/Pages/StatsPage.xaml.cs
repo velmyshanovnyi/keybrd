@@ -141,6 +141,104 @@ namespace Keybrd.Pages
             InsightConfusion();
             InsightShift();
             InsightRhythm();
+            InsightFingers();
+        }
+
+        // ---------- пальці й руки ----------
+
+        private static readonly string[] FingerNames =
+        {
+            "лівий мізинець", "лівий безіменний", "лівий середній", "лівий вказівний",
+            "правий вказівний", "правий середній", "правий безіменний", "правий мізинець",
+        };
+
+        private static Finger FingerOfChar(string layout, char c)
+            => KeyboardLayout.Find(layout, c, out int id, out _) ? KeyboardLayout.FingerOf(id) : Finger.None;
+
+        private static void Add(KeyStat to, KeyStat from)
+        {
+            to.Hits += from.Hits; to.Errors += from.Errors; to.Timed += from.Timed; to.TotalMs += from.TotalMs;
+        }
+
+        private static string StatText(KeyStat s)
+            => s.Total == 0 ? "—" : $"{s.Total} натискань · помилок {s.ErrorRate * 100:0.#}%" + (s.Timed > 0 ? $" · {s.AvgMs:0} мс" : "");
+
+        private void InsightFingers()
+        {
+            string lay = Layout;
+            var fingers = new KeyStat[8];
+            for (int i = 0; i < 8; i++) fingers[i] = new KeyStat();
+            foreach (var kv in StatsStore.KeysOf(lay))
+            {
+                if (kv.Key.Length != 1 || kv.Key == " ") continue;
+                var f = FingerOfChar(lay, kv.Key[0]);
+                if (f >= Finger.LPinky && f <= Finger.RPinky) Add(fingers[(int)f], kv.Value);
+            }
+            if (fingers.Sum(f => f.Total) < 50) return;
+
+            var p = InsightCard("Пальці й руки",
+                "Скільки натискань припадає на кожен палець, як часто він помиляється і скільки в середньому триває рух до клавіші.");
+
+            // Найслабший палець: помилки важать утричі більше за повільність відносно середнього.
+            var timed = fingers.Where(f => f.Timed >= 5).ToList();
+            double mean = timed.Count > 0 ? timed.Average(f => f.AvgMs) : 0;
+            double Score(KeyStat f) => f.Total < 10 ? -1 : f.ErrorRate * 3 + (mean > 0 && f.Timed > 0 ? Math.Max(0, f.AvgMs / mean - 1) : 0);
+            int weakest = Enumerable.Range(0, 8).OrderByDescending(i => Score(fingers[i])).First();
+            bool hasWeak = Score(fingers[weakest]) >= 0.1;
+
+            var grid = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            void Row(string a, string b, string c, string d, string e, bool muted, bool bold)
+            {
+                int r = grid.RowDefinitions.Count;
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                string[] cells = { a, b, c, d, e };
+                for (int i = 0; i < cells.Length; i++)
+                {
+                    var t = new TextBlock { Text = cells[i], Margin = new Thickness(0, 3, 8, 3), FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal };
+                    if (muted) t.SetResourceReference(TextBlock.ForegroundProperty, "FgMutedBrush");
+                    if (i == 4 && !muted) t.SetResourceReference(TextBlock.ForegroundProperty, "ErrorBrush");
+                    Grid.SetRow(t, r); Grid.SetColumn(t, i);
+                    grid.Children.Add(t);
+                }
+            }
+            Row("палець", "натискань", "помилок", "інтервал", "", true, false);
+            for (int i = 0; i < 8; i++)
+            {
+                var f = fingers[i];
+                bool weak = hasWeak && i == weakest;
+                Row(FingerNames[i], f.Total.ToString(), f.Total > 0 ? $"{f.ErrorRate * 100:0.#}%" : "—", f.Timed > 0 ? $"{f.AvgMs:0} мс" : "—",
+                    weak ? "найслабший" : "", false, weak);
+            }
+            p.Children.Add(grid);
+
+            var left = new KeyStat(); var right = new KeyStat();
+            for (int i = 0; i < 4; i++) { Add(left, fingers[i]); Add(right, fingers[i + 4]); }
+            Line(p, $"Ліва рука: {StatText(left)}");
+            Line(p, $"Права рука: {StatText(right)}");
+
+            // Сполучення: одним пальцем, однією рукою, з чергуванням рук.
+            var same = new KeyStat(); var hand = new KeyStat(); var alt = new KeyStat();
+            foreach (var kv in StatsStore.Bigrams.TryGetValue(lay, out var bg) ? bg : new Dictionary<string, KeyStat>())
+            {
+                if (kv.Key.Length != 2 || kv.Key[0] == kv.Key[1]) continue;
+                var a = FingerOfChar(lay, kv.Key[0]); var b = FingerOfChar(lay, kv.Key[1]);
+                if (a < Finger.LPinky || a > Finger.RPinky || b < Finger.LPinky || b > Finger.RPinky) continue;
+                bool la = a <= Finger.LIndex, lb = b <= Finger.LIndex;
+                Add(a == b ? same : la == lb ? hand : alt, kv.Value);
+            }
+            if (same.Total + hand.Total + alt.Total > 0)
+            {
+                Line(p, "Сполучення двох літер (час другої літери):", true);
+                Line(p, $"з чергуванням рук: {StatText(alt)}");
+                Line(p, $"однією рукою, різними пальцями: {StatText(hand)}");
+                Line(p, $"одним пальцем: {StatText(same)}");
+            }
+            if (hasWeak) Line(p, $"Порада: {FingerNames[weakest]} палець найслабший — вправа «Слабкі місця» дає більше слів з його клавішами.", true);
         }
 
         private void InsightRhythm()

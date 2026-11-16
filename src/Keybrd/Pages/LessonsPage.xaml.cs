@@ -75,7 +75,9 @@ namespace Keybrd.Pages
             AddRow(Course.Weak(Layout));
             AddRow(Course.Confusion(Layout));
             AddRow(Course.Custom(Layout));
+            AddRow(Course.Dictation(Layout));
             AddRow(Course.Exam(Layout));
+            AddRow(Course.Placement(Layout));
 
             int stage = 0;
             foreach (var l in course)
@@ -183,6 +185,9 @@ namespace Keybrd.Pages
             DLock.Text = dyn ? DynamicSummary(l.Layout, keys.Length > 0)
                 : l.Kind == LessonKind.Daily ? Capital(StatsStore.DaySummary()) + "."
                 : l.Kind == LessonKind.Exam ? ExamSummary(l.Layout)
+                : l.Kind == LessonKind.Dictation ? (Speech.Available(l.Layout)
+                    ? "Голос: " + Speech.VoiceName(l.Layout) + "."
+                    : "У Windows немає голосу для цієї мови, тому диктант працюватиме як звичайна вправа. Як додати голос — на вкладці «Налаштування».")
                 : l.Kind == LessonKind.Confusion && keys.Length == 0
                 ? "Стійких пар поки немає: пара з’являється після трьох однакових помилок. Зараз вправа складатиметься з частих слів."
                 : l.Kind == LessonKind.Confusion ? "Зараз у роботі ці пари: потрібна літера → та, яку ви натискаєте замість неї."

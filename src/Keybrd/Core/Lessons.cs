@@ -125,6 +125,16 @@ namespace Keybrd.Core
             "Триває 1, 3 або 5 хвилин (змінюється в налаштуваннях) і зупиняється сам. Результати зберігаються окремо, " +
             "щоб порівнювати себе з собою місяць тому.", 120);
 
+        public static Lesson Placement(string layout) => Practice(layout, "placement", LessonKind.Placement, "Вступний тест",
+            "Для тих, хто вже трохи друкує. Один текст, де кожна літера трапляється щонайменше тричі. Після нього програма бачить, " +
+            "які літери ви знаєте (без помилок і довгих пауз), відкриває їх у динамічному навчанні й зараховує відповідні уроки курсу. " +
+            "Потрібні точність від 90% і швидкість від 60 зн/хв; інакше нічого не змінюється.", 420);
+
+        public static Lesson Dictation(string layout) => Practice(layout, "dictation", LessonKind.Dictation, "Диктант",
+            "Речення озвучуються, а ще не набраний текст приховано — друкуєте на слух, не читаючи. Tab повторює фразу. " +
+            "Після трьох помилок на одному місці літера відкривається. Потрібен голос Windows для цієї мови; " +
+            "якщо його немає, текст показується як звичайно.", 160);
+
         public static Lesson Find(string id)
         {
             if (string.IsNullOrEmpty(id)) return null;
@@ -137,6 +147,8 @@ namespace Keybrd.Core
             if (id.EndsWith("-confusion")) return Confusion(layout);
             if (id.EndsWith("-daily")) return Daily(layout);
             if (id.EndsWith("-exam")) return Exam(layout);
+            if (id.EndsWith("-placement")) return Placement(layout);
+            if (id.EndsWith("-dictation")) return Dictation(layout);
             return For(layout).FirstOrDefault(l => l.Id == id);
         }
 
